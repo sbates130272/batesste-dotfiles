@@ -20,3 +20,8 @@ idempotent
 stebates
 sbates
 raithlin
+batesste
+repo
+auth
+Ansible
+CLI
