@@ -1,0 +1,231 @@
+{
+  "env": {
+    "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
+    "ANTHROPIC_API_KEY": "REPLACE_ME",
+    "OTEL_METRICS_EXPORTER": "otlp",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+    "OTEL_RESOURCE_ATTRIBUTES": "deployment.environment=production,service.namespace=genai,user.name=REPLACE_ME,user.id=REPLACE_ME,session.id=REPLACE_ME",
+    "ANTHROPIC_CUSTOM_HEADERS": "Ocp-Apim-Subscription-Key: REPLACE_ME",
+    "OTEL_TRACES_EXPORTER": "otlp",
+    "OTEL_LOG_TOOL_DETAILS": "0",
+    "OTEL_LOG_RAW_API_BODIES": "0",
+    "OTEL_EXPORTER_OTLP_ENDPOINT": "https://collector.slug.amd.com",
+    "ANTHROPIC_BASE_URL": "https://llm-api.amd.com/Anthropic",
+    "OTEL_LOG_TOOL_CONTENT": "0",
+    "OTEL_LOG_USER_PROMPTS": "0",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "Claude-Sonnet-4.6",
+    "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
+    "CLAUDE_CODE_ENHANCED_TELEMETRY_BETA": "1",
+    "ANTHROPIC_MODEL": "Claude-Sonnet-4.6",
+    "CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS": "1",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "Claude-Opus-4.8",
+    "OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE": "cumulative",
+    "ENABLE_TOOL_SEARCH": "true",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "Claude-Haiku-4.5",
+    "OTEL_LOGS_EXPORTER": "otlp"
+  },
+  "permissions": {
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./secrets/**)",
+      "Read(./.aws/**)",
+      "Read(~/.ssh/**)",
+      "Read(./config/credentials.json)",
+      "Read(./appsettings.*.json)",
+      "Bash(curl:*)",
+      "Bash(wget:*)",
+      "Bash(rm -rf:*)",
+      "WebFetch"
+    ],
+    "ask": [
+      "Bash(git push:*)",
+      "Bash(npm publish:*)",
+      "Bash(docker:*)",
+      "Bash(kubectl:*)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/home/stebates/.pixel-agents/hooks/claude-hook.js\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/home/stebates/.pixel-agents/hooks/claude-hook.js\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/home/stebates/.pixel-agents/hooks/claude-hook.js\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/home/stebates/.claude/hooks/claude-notifier-on-stop.js\""
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/home/stebates/.pixel-agents/hooks/claude-hook.js\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/home/stebates/.claude/hooks/claude-notifier-on-permission.js\""
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/home/stebates/.pixel-agents/hooks/claude-hook.js\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/home/stebates/.pixel-agents/hooks/claude-hook.js\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/home/stebates/.claude/hooks/claude-notifier-on-prompt.js\""
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/home/stebates/.pixel-agents/hooks/claude-hook.js\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "AskUserQuestion",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/home/stebates/.claude/hooks/claude-notifier-on-question.js\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/home/stebates/.pixel-agents/hooks/claude-hook.js\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/home/stebates/.pixel-agents/hooks/claude-hook.js\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/home/stebates/.pixel-agents/hooks/claude-hook.js\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/home/stebates/.pixel-agents/hooks/claude-hook.js\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/home/stebates/.claude/hooks/claude-notifier-on-subagent-stop.js\""
+          }
+        ]
+      }
+    ]
+  },
+  "companyAnnouncements": [
+    "Welcome to Claude Code - AMD Edition!",
+    "Review AMD coding standards before committing code",
+    "Security reminder: Never commit credentials, API keys, or sensitive data",
+    "Tip: Use /help to see available commands and features"
+  ],
+  "theme": "auto",
+  "skipDangerousModePermissionPrompt": true
+}

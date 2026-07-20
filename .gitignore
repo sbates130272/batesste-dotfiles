@@ -1,0 +1,28 @@
+# Ignore stow backup files
+*.stow-local-ignore
+*~
+
+# Secrets — never commit these
+*.token
+*.key
+*secret*
+hosts.yml
+
+# Claude — session and runtime state (not config)
+.claude/history.jsonl
+.claude/mcp-needs-auth-cache.json
+.claude/backups/
+.claude/downloads/
+.claude/file-history/
+.claude/plans/
+.claude/plugins/
+.claude/projects/
+.claude/session-env/
+.claude/sessions/
+.claude/shell-snapshots/
+.claude/ide/
+.claude/hooks/claude-notifier-active.d/
+.claude/hooks/claude-notifier-task-start/
+.claude/hooks/claude-notifier-focus
+.claude/hooks/claude-notifier-muted
+.claude/hooks/claude-signal

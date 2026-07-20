@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ssh snoc-think *)",
+      "Bash(netstat -tlnp)",
+      "Bash(ssh -f -N -R 8888:127.0.0.1:8888 snoc-think)"
+    ]
+  }
+}

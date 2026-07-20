@@ -1,0 +1,66 @@
+name: Validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  no-live-secrets:
+    name: no live secrets in settings.json
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check settings.json placeholders
+        run: |
+          FILE="claude/.claude/settings.json"
+          if [ ! -f "$FILE" ]; then
+            echo "SKIP: $FILE not present"
+            exit 0
+          fi
+          # Fail if any REPLACE_ME placeholder has been overwritten with a real value.
+          # A committed live key starts with sk-ant-, hf_, or is 32+ hex chars.
+          if grep -qE '"(sk-ant-|hf_)[^"]+"|"[0-9a-f]{32,}"' "$FILE"; then
+            echo "ERROR: $FILE appears to contain a live secret. Redact before committing."
+            exit 1
+          fi
+          # Warn if REPLACE_ME placeholders are still present (expected on first push).
+          if grep -q "REPLACE_ME" "$FILE"; then
+            echo "INFO: REPLACE_ME placeholders still present in $FILE — fill them in on the target machine after stowing."
+          fi
+          echo "OK"
+
+  stow-structure:
+    name: stow package structure
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install stow
+        run: sudo apt-get update && sudo apt-get install -y stow
+
+      - name: Dry-run stow for all packages
+        run: |
+          DOTFILES_DIR="$PWD"
+          TARGET="$(mktemp -d)"
+          failed=0
+          for pkg in bash claude gh git hf; do
+            if [ -d "$DOTFILES_DIR/$pkg" ]; then
+              echo "Checking $pkg..."
+              stow --dir="$DOTFILES_DIR" --target="$TARGET" --simulate "$pkg" || {
+                echo "ERROR: stow dry-run failed for $pkg"
+                failed=1
+              }
+            fi
+          done
+          rm -rf "$TARGET"
+          exit $failed

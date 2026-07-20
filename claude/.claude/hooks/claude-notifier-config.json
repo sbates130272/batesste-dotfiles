@@ -1,0 +1,29 @@
+{
+  "taskCompleted": {
+    "level": "popup",
+    "sound": "Hero"
+  },
+  "needsPermission": {
+    "level": "popup",
+    "sound": "Glass"
+  },
+  "asksQuestion": {
+    "level": "popup",
+    "sound": "Funk"
+  },
+  "userPromptSubmit": {
+    "level": "sound+popup",
+    "sound": ""
+  },
+  "subagentCompleted": {
+    "level": "off",
+    "sound": "Pop"
+  },
+  "soundVolume": 1,
+  "minTaskDurationThreshold": 10,
+  "suppressSubagentInteractions": true,
+  "remoteAudio": {
+    "enabled": true,
+    "port": 47291
+  }
+}

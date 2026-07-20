@@ -1,0 +1,12 @@
+[core]
+	editor = emacs
+[user]
+	name = Stephen Bates
+	email = sbates@raithlin.com
+	signingkey = CB05CB5CFA5DFD9850BB814DE0C020C1975548AE
+[commit]
+	gpgsign = true
+[pull]
+	rebase = false
+[init]
+	defaultBranch = main

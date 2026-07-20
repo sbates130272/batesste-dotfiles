@@ -1,0 +1,34 @@
+name: Spellcheck
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "**.md"
+      - ".spellcheck.yml"
+      - ".wordlist.txt"
+  pull_request:
+    branches: [main]
+    paths:
+      - "**.md"
+      - ".spellcheck.yml"
+      - ".wordlist.txt"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: spellcheck-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  spellcheck:
+    name: spellcheck
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: GitHub Spellcheck Action
+        uses: rojopolis/spellcheck-github-actions@v0
+        with:
+          config_path: .spellcheck.yml
