@@ -79,12 +79,15 @@ post_install_reminders() {
         warned=1
     fi
 
-    # HuggingFace: token file must exist at the path referenced by HF_TOKEN_FILE
+    # HuggingFace: token file must exist at the path referenced by HF_TOKEN_FILE.
+    # On Ansible-managed machines this file is written from vault by user_setup — skip
+    # this reminder if it already exists (Ansible got there first).
     local hf_token="${HF_TOKEN_FILE:-$HOME/.batesste-hugging-face-read-march-2026.token}"
     if [[ ! -f "$hf_token" ]]; then
         echo ""
         echo "[dotfiles] ACTION REQUIRED: HuggingFace token not found at $hf_token"
-        echo "           Create it: echo 'hf_...' > $hf_token && chmod 600 $hf_token"
+        echo "           Option A (manual): echo 'hf_...' > $hf_token && chmod 600 $hf_token"
+        echo "           Option B (Ansible): run user_setup with vault_hf_token set in secrets.yml"
         warned=1
     fi
 
