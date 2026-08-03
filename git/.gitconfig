@@ -1,5 +1,6 @@
 [core]
 	editor = emacs
+	hooksPath = ~/.config/git/hooks
 [user]
 	name = Stephen Bates
 	email = sbates@raithlin.com

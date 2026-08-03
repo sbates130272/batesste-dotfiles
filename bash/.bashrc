@@ -114,8 +114,8 @@ if [ -f "$HOME/.config/rocm/wsl-env.sh" ]; then
   . "$HOME/.config/rocm/wsl-env.sh"
 fi
 
-# HuggingFace token location
-export HF_TOKEN_FILE="$HOME/.batesste-hugging-face-read-march-2026.token"
+# HuggingFace token (stowed from dotfiles via git-crypt)
+export HF_TOKEN_FILE="$HOME/.hf_token"
 
 # PATH additions (deduplicated)
 export PATH="/home/stebates/.local/bin:$PATH"

@@ -6,7 +6,7 @@ Personal dotfiles for Stephen Bates, managed with [GNU Stow](https://www.gnu.org
 
 Each top-level directory is a **stow package** — its contents mirror `$HOME`. For example:
 
-```
+```text
 bash/
   .bashrc
   .profile
@@ -23,18 +23,21 @@ Running `stow bash` from the repo root creates `~/.bashrc -> ~/Projects/batesste
 ## Requirements
 
 ```bash
-sudo apt install stow git
+sudo apt install stow git git-crypt
 ```
+
+Your GPG private key must be available on any new machine (used for both commit signing and decrypting secrets via git-crypt).
 
 ## Install
 
-Install all packages:
-
 ```bash
+git clone git@github.com:sbates130272/batesste-dotfiles.git ~/Projects/batesste-dotfiles
+cd ~/Projects/batesste-dotfiles
+git-crypt unlock    # requires your GPG private key
 ./install.sh
 ```
 
-Install specific packages:
+Install specific packages only:
 
 ```bash
 ./install.sh bash git
@@ -47,9 +50,22 @@ Install specific packages:
 3. Run `./install.sh tmux` to stow it.
 4. Commit and push.
 
+## Secrets
+
+Secrets are stored encrypted in this repo using [git-crypt](https://github.com/AGWA/git-crypt). The following files are encrypted at rest and only readable after `git-crypt unlock`:
+
+| File | Purpose |
+| --- | --- |
+| `claude/.claude/settings.json` | Anthropic API key, subscription key, OTEL attributes |
+| `gh/.config/gh/hosts.yml` | GitHub CLI auth token |
+| `hf/.hf_token` | HuggingFace read token |
+| `docker/.docker/config.json` | Docker Hub auth credential |
+| `docker/.docker-bateste-pat-july-2026` | Docker personal access token |
+
+Secrets are encrypted with git-crypt. Import your GPG private key before running `git-crypt unlock`.
+
 ## Notes
 
-- `gh/hosts.yml` is excluded via `.gitignore` — it contains auth tokens.
-- GPG signing is enabled in `.gitconfig`; ensure your key `CB05CB5CFA5DFD9850BB814DE0C020C1975548AE` is present on any new machine.
+- GPG commit signing is enabled in `.gitconfig`; the same key used for secrets also signs commits.
 - ROCm WSL environment is sourced from `~/.config/rocm/wsl-env.sh` (not tracked here, managed by Ansible).
 - `REQUESTS_CA_BUNDLE` is set in `.bashrc` for Claude CLI to work behind the AMD ZScaler CA.
