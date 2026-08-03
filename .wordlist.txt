@@ -27,3 +27,6 @@ repo
 auth
 Ansible
 CLI
+AWS
+pmem
+envsubst

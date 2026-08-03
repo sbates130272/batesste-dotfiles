@@ -7,6 +7,7 @@ Personal dotfiles for Stephen Bates, managed with [GNU Stow](https://www.gnu.org
 Each top-level directory is a **stow package** — its contents mirror `$HOME`. For example:
 
 ```text
+aws/           # ~/.aws/config (non-secret region/output settings)
 bash/          # ~/.bashrc, ~/.profile
 claude/        # ~/.claude/settings.json and hooks
 emacs/         # ~/.emacs, ~/.emacs.d/init.el
@@ -57,9 +58,9 @@ Secrets are stored encrypted in this repo using [git-crypt](https://github.com/A
 
 | File | Purpose |
 | --- | --- |
-| `secrets/.secrets.env` | All secret values (`HF_TOKEN`, `DOCKER_PAT`, `DOCKER_AUTH`, `ANTHROPIC_API_KEY`, `ANTHROPIC_CUSTOM_HEADERS`, `OTEL_RESOURCE_ATTRIBUTES`, `GH_TOKEN_*`) |
+| `secrets/.secrets.env` | All secret values (`HF_TOKEN`, `DOCKER_PAT`, `DOCKER_AUTH`, `ANTHROPIC_API_KEY`, `ANTHROPIC_CUSTOM_HEADERS`, `OTEL_RESOURCE_ATTRIBUTES`, `GH_TOKEN_*`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_BATESSTE_PMEM_KEY_B64`) |
 
-`install.sh` uses `envsubst` to expand `templates/gh-hosts.yml` and `templates/docker-config.json` into `$HOME` after sourcing the secrets file.
+`install.sh` uses `envsubst` to expand templates in `templates/` into `$HOME` after sourcing the secrets file. The AWS pmem key is stored base64-encoded and decoded by `install.sh` during expansion.
 
 Secrets are encrypted with git-crypt. Import your GPG private key before running `git-crypt unlock`.
 
