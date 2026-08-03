@@ -2,6 +2,7 @@ AMD
 ROCm
 WSL
 ZScaler
+Anthropic
 dotfiles
 stow
 gitconfig
@@ -17,6 +18,7 @@ telemetry
 notifier
 subagent
 idempotent
+decrypting
 stebates
 sbates
 raithlin
