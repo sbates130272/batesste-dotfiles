@@ -1,0 +1,53 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          PREV_TAG=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sed -n '2p')
+          CURR_TAG="${GITHUB_REF_NAME}"
+          if [ -n "$PREV_TAG" ]; then
+            LOG=$(git log "${PREV_TAG}..${CURR_TAG}" --pretty=format:"- %s" --no-merges)
+          else
+            LOG=$(git log --pretty=format:"- %s" --no-merges)
+          fi
+          {
+            echo "changelog<<EOF"
+            echo "$LOG"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          body: |
+            ## What's changed
+
+            ${{ steps.changelog.outputs.changelog }}
+
+            ## Installing
+
+            ```bash
+            git clone git@github.com:sbates130272/batesste-dotfiles.git ~/Projects/batesste-dotfiles
+            cd ~/Projects/batesste-dotfiles
+            git-crypt unlock
+            ./install.sh
+            ```
+          generate_release_notes: false
