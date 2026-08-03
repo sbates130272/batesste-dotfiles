@@ -93,6 +93,16 @@ expand_templates() {
         envsubst < "$tmpl_dir/docker-config.json" > "$HOME/.docker/config.json"
         chmod 600 "$HOME/.docker/config.json"
         log "Expanded docker/config.json"
+
+        install -d "$HOME/.aws"
+        envsubst < "$tmpl_dir/aws-credentials" > "$HOME/.aws/credentials"
+        chmod 600 "$HOME/.aws/credentials"
+        log "Expanded aws/credentials"
+
+        local pmem_name="batesste-20160101.pmem"
+        printf '%s' "$AWS_BATESSTE_PMEM_KEY_B64" | base64 -d > "$HOME/.aws/$pmem_name"
+        chmod 600 "$HOME/.aws/$pmem_name"
+        log "Expanded aws/$pmem_name"
     )
 }
 
