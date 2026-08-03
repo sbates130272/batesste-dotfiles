@@ -1,0 +1,9 @@
+github.com:
+    users:
+        stebates_amdeng:
+            oauth_token: ${GH_TOKEN_STEBATES_AMDENG}
+        sbates130272:
+            oauth_token: ${GH_TOKEN_SBATES130272}
+    git_protocol: ssh
+    user: stebates_amdeng
+    oauth_token: ${GH_TOKEN_STEBATES_AMDENG}

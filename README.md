@@ -7,15 +7,14 @@ Personal dotfiles for Stephen Bates, managed with [GNU Stow](https://www.gnu.org
 Each top-level directory is a **stow package** — its contents mirror `$HOME`. For example:
 
 ```text
-bash/
-  .bashrc
-  .profile
-git/
-  .gitconfig
-gh/
-  .config/
-    gh/
-      config.yml
+bash/          # ~/.bashrc, ~/.profile
+claude/        # ~/.claude/settings.json and hooks
+emacs/         # ~/.emacs, ~/.emacs.d/init.el
+gh/            # ~/.config/gh/config.yml (non-secret gh settings)
+git/           # ~/.gitconfig, ~/.config/git/hooks/pre-commit
+secrets/       # ~/.secrets.env (git-crypt encrypted)
+ssh/           # ~/.ssh/config
+templates/     # envsubst templates expanded by install.sh (not stowed)
 ```
 
 Running `stow bash` from the repo root creates `~/.bashrc -> ~/Projects/batesste-dotfiles/bash/.bashrc` etc.
@@ -23,8 +22,10 @@ Running `stow bash` from the repo root creates `~/.bashrc -> ~/Projects/batesste
 ## Requirements
 
 ```bash
-sudo apt install stow git git-crypt
+sudo apt install stow git git-crypt gettext-base
 ```
+
+(`gettext-base` provides `envsubst`, used to expand secret templates at install time.)
 
 Your GPG private key must be available on any new machine (used for both commit signing and decrypting secrets via git-crypt).
 
@@ -56,11 +57,9 @@ Secrets are stored encrypted in this repo using [git-crypt](https://github.com/A
 
 | File | Purpose |
 | --- | --- |
-| `claude/.claude/settings.json` | Anthropic API key, subscription key, OTEL attributes |
-| `gh/.config/gh/hosts.yml` | GitHub CLI auth token |
-| `hf/.hf_token` | HuggingFace read token |
-| `docker/.docker/config.json` | Docker Hub auth credential |
-| `docker/.docker-bateste-pat-july-2026` | Docker personal access token |
+| `secrets/.secrets.env` | All secret values (`HF_TOKEN`, `DOCKER_PAT`, `DOCKER_AUTH`, `ANTHROPIC_API_KEY`, `ANTHROPIC_CUSTOM_HEADERS`, `OTEL_RESOURCE_ATTRIBUTES`, `GH_TOKEN_*`) |
+
+`install.sh` uses `envsubst` to expand `templates/gh-hosts.yml` and `templates/docker-config.json` into `$HOME` after sourcing the secrets file.
 
 Secrets are encrypted with git-crypt. Import your GPG private key before running `git-crypt unlock`.
 

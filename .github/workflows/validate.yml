@@ -15,25 +15,41 @@ concurrency:
 
 jobs:
   no-live-secrets:
-    name: no live secrets in settings.json
+    name: no live secrets in plaintext files
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check settings.json is git-crypt encrypted
+      - name: Check secrets.env is git-crypt encrypted
         run: |
-          FILE="claude/.claude/settings.json"
+          FILE="secrets/.secrets.env"
           if [ ! -f "$FILE" ]; then
             echo "SKIP: $FILE not present"
             exit 0
           fi
-          # Verify the file is git-crypt encrypted (binary blob, not plaintext JSON).
-          # git-crypt encrypted files start with the magic header "\x00GITCRYPT".
-          if file "$FILE" | grep -q "ASCII\|UTF-8\|JSON"; then
-            echo "ERROR: $FILE is not encrypted. It must be protected by git-crypt before committing."
+          if file "$FILE" | grep -qE "ASCII|UTF-8|text"; then
+            echo "ERROR: $FILE is not encrypted — it must be protected by git-crypt."
             exit 1
           fi
           echo "OK: $FILE is encrypted"
+
+      - name: Check plaintext files contain no secrets
+        run: |
+          failed=0
+          for f in \
+              claude/.claude/settings.json \
+              templates/gh-hosts.yml \
+              templates/docker-config.json; do
+            [ -f "$f" ] || continue
+            # Reject real token values; allow envsubst placeholders (${VAR})
+            if grep -qP '(sk-ant-|hf_[A-Za-z0-9]{10}|ghp_[A-Za-z0-9]{10}|dckr_pat_)[^\s"]+' "$f"; then
+              echo "ERROR: $f appears to contain a live secret."
+              failed=1
+            else
+              echo "OK: $f"
+            fi
+          done
+          exit $failed
 
   stow-structure:
     name: stow package structure
@@ -49,7 +65,7 @@ jobs:
           DOTFILES_DIR="$PWD"
           TARGET="$(mktemp -d)"
           failed=0
-          for pkg in bash claude docker emacs gh git hf ssh; do
+          for pkg in bash claude emacs gh git secrets ssh; do
             if [ -d "$DOTFILES_DIR/$pkg" ]; then
               echo "Checking $pkg..."
               stow --dir="$DOTFILES_DIR" --target="$TARGET" --simulate "$pkg" || {

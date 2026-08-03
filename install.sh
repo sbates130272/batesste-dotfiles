@@ -7,14 +7,15 @@ log() { echo "[dotfiles] $*"; }
 
 check_deps() {
     local missing=()
-    for dep in stow git git-crypt; do
+    for dep in stow git git-crypt envsubst; do
         if ! command -v "$dep" &>/dev/null; then
             missing+=("$dep")
         fi
     done
     if [[ ${#missing[@]} -gt 0 ]]; then
         echo "Missing dependencies: ${missing[*]}"
-        echo "Install with: sudo apt install ${missing[*]}"
+        echo "Install with: sudo apt install stow git git-crypt gettext-base"
+        echo "Missing: ${missing[*]}"
         exit 1
     fi
 }
@@ -62,8 +63,37 @@ main() {
         stow_package "$pkg"
     done
 
+    expand_templates
     post_install_reminders
     log "Done."
+}
+
+expand_templates() {
+    local secrets="$HOME/.secrets.env"
+    local tmpl_dir="$DOTFILES_DIR/templates"
+
+    if [[ ! -f "$secrets" ]]; then
+        log "Skipping template expansion: ~/.secrets.env not found (run git-crypt unlock first)"
+        return
+    fi
+
+    # Source secrets into a subshell so envsubst can see them, then write outputs.
+    (
+        set -a
+        # shellcheck source=/dev/null
+        . "$secrets"
+        set +a
+
+        install -d "$HOME/.config/gh"
+        envsubst < "$tmpl_dir/gh-hosts.yml" > "$HOME/.config/gh/hosts.yml"
+        chmod 600 "$HOME/.config/gh/hosts.yml"
+        log "Expanded gh/hosts.yml"
+
+        install -d "$HOME/.docker"
+        envsubst < "$tmpl_dir/docker-config.json" > "$HOME/.docker/config.json"
+        chmod 600 "$HOME/.docker/config.json"
+        log "Expanded docker/config.json"
+    )
 }
 
 check_gpg_key() {

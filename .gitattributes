@@ -1,5 +1,1 @@
-claude/.claude/settings.json filter=git-crypt diff=git-crypt
-gh/.config/gh/hosts.yml filter=git-crypt diff=git-crypt
-hf/.hf_token filter=git-crypt diff=git-crypt
-docker/.docker/config.json filter=git-crypt diff=git-crypt
-docker/.docker-bateste-pat-july-2026 filter=git-crypt diff=git-crypt
+secrets/.secrets.env filter=git-crypt diff=git-crypt
