@@ -4,9 +4,10 @@
 
 # Secrets — never commit these (git-crypt handles specific tracked secret files)
 *.token
-!hf/.hf_token
 *.key
 *secret*
+!secrets/
+!secrets/.secrets.env
 
 # Claude — session and runtime state (not config)
 .claude/history.jsonl
