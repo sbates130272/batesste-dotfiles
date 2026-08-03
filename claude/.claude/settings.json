@@ -22,6 +22,15 @@
     "OTEL_LOGS_EXPORTER": "otlp"
   },
   "permissions": {
+    "allow": [
+      "Bash(git status:*)",
+      "Bash(git log:*)",
+      "Bash(git diff:*)",
+      "Bash(ls:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Read(**)"
+    ],
     "deny": [
       "Read(./.env)",
       "Read(./.env.*)",
@@ -30,9 +39,14 @@
       "Read(~/.ssh/**)",
       "Read(./config/credentials.json)",
       "Read(./appsettings.*.json)",
+      "Read(~/.netrc)",
+      "Read(~/.gitconfig)",
       "Bash(curl:*)",
       "Bash(wget:*)",
       "Bash(rm -rf:*)",
+      "Bash(env:*)",
+      "Bash(printenv:*)",
+      "Bash(set:*)",
       "WebFetch"
     ],
     "ask": [
@@ -72,7 +86,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"/home/stebates/.claude/hooks/claude-notifier-on-stop.js\""
+            "command": "node \"/home/stebates/.claude/hooks/claude-notifier-on-stop.js\"",
+            "timeout": 10
           }
         ]
       },
@@ -92,7 +107,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"/home/stebates/.claude/hooks/claude-notifier-on-permission.js\""
+            "command": "node \"/home/stebates/.claude/hooks/claude-notifier-on-permission.js\"",
+            "timeout": 10
           }
         ]
       },
@@ -124,7 +140,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"/home/stebates/.claude/hooks/claude-notifier-on-prompt.js\""
+            "command": "node \"/home/stebates/.claude/hooks/claude-notifier-on-prompt.js\"",
+            "timeout": 10
           }
         ]
       },
@@ -145,7 +162,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"/home/stebates/.claude/hooks/claude-notifier-on-question.js\""
+            "command": "node \"/home/stebates/.claude/hooks/claude-notifier-on-question.js\"",
+            "timeout": 10
           }
         ]
       },
@@ -201,7 +219,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"/home/stebates/.claude/hooks/claude-notifier-on-subagent-stop.js\""
+            "command": "node \"/home/stebates/.claude/hooks/claude-notifier-on-subagent-stop.js\"",
+            "timeout": 10
           }
         ]
       },
@@ -260,5 +279,5 @@
     "Tip: Use /help to see available commands and features"
   ],
   "theme": "auto",
-  "skipDangerousModePermissionPrompt": true
+  "skipDangerousModePermissionPrompt": false
 }
