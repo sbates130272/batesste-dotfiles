@@ -2,11 +2,11 @@
 *.stow-local-ignore
 *~
 
-# Secrets — never commit these
+# Secrets — never commit these (git-crypt handles specific tracked secret files)
 *.token
+!hf/.hf_token
 *.key
 *secret*
-hosts.yml
 
 # Claude — session and runtime state (not config)
 .claude/history.jsonl

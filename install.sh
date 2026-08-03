@@ -7,7 +7,7 @@ log() { echo "[dotfiles] $*"; }
 
 check_deps() {
     local missing=()
-    for dep in stow git; do
+    for dep in stow git git-crypt; do
         if ! command -v "$dep" &>/dev/null; then
             missing+=("$dep")
         fi
@@ -66,28 +66,36 @@ main() {
     log "Done."
 }
 
+check_gpg_key() {
+    # Derive the required fingerprint from the git-crypt key file name.
+    local key_dir="$DOTFILES_DIR/.git-crypt/keys/default/0"
+    local fingerprint
+    fingerprint="$(ls "$key_dir" 2>/dev/null | sed 's/\.gpg$//')"
+    if [[ -z "$fingerprint" ]]; then
+        return  # can't determine key, skip check
+    fi
+    if ! gpg --list-secret-keys "$fingerprint" &>/dev/null; then
+        echo ""
+        echo "[dotfiles] WARNING: GPG private key $fingerprint is not available."
+        echo "           git-crypt unlock and GPG commit signing will not work until"
+        echo "           this key is imported. Transfer it from another machine with:"
+        echo "             gpg --export-secret-keys $fingerprint | gpg --import"
+    fi
+}
+
 post_install_reminders() {
     local warned=0
 
-    # Claude: settings.json contains REPLACE_ME placeholders for secrets
-    local claude_settings="$HOME/.claude/settings.json"
-    if [[ -f "$claude_settings" ]] && grep -q "REPLACE_ME" "$claude_settings"; then
-        echo ""
-        echo "[dotfiles] ACTION REQUIRED: ~/.claude/settings.json contains REPLACE_ME placeholders."
-        echo "           Fill in: ANTHROPIC_API_KEY, ANTHROPIC_CUSTOM_HEADERS subscription key,"
-        echo "           and OTEL_RESOURCE_ATTRIBUTES (user.name, user.id, session.id)."
-        warned=1
-    fi
+    check_gpg_key
 
-    # HuggingFace: token file must exist at the path referenced by HF_TOKEN_FILE.
-    # On Ansible-managed machines this file is written from vault by user_setup — skip
-    # this reminder if it already exists (Ansible got there first).
-    local hf_token="${HF_TOKEN_FILE:-$HOME/.batesste-hugging-face-read-march-2026.token}"
-    if [[ ! -f "$hf_token" ]]; then
+    # git-crypt: secrets are encrypted in this repo — unlock before stowing.
+    if git -C "$DOTFILES_DIR" crypt status 2>/dev/null | grep -q "not encrypted"; then
+        : # unlocked, nothing to warn about
+    elif git -C "$DOTFILES_DIR" crypt status 2>/dev/null | grep -q "encrypted"; then
         echo ""
-        echo "[dotfiles] ACTION REQUIRED: HuggingFace token not found at $hf_token"
-        echo "           Option A (manual): echo 'hf_...' > $hf_token && chmod 600 $hf_token"
-        echo "           Option B (Ansible): run user_setup with vault_hf_token set in secrets.yml"
+        echo "[dotfiles] ACTION REQUIRED: git-crypt secrets are still locked."
+        echo "           Run: git-crypt unlock"
+        echo "           (requires your GPG private key, then re-run install.sh)"
         warned=1
     fi
 

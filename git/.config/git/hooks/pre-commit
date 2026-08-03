@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# Scan staged files for patterns that look like secrets before committing.
+# git-crypt encrypted files are binary blobs — they are skipped automatically
+# since grep will not match text patterns in them.
+set -euo pipefail
+
+RED='\033[0;31m'
+YELLOW='\033[0;33m'
+NC='\033[0m'
+
+# Patterns that strongly indicate a secret value (not just a key name).
+# Each entry is a label and a regex applied to staged file content.
+declare -A PATTERNS=(
+    ["Anthropic API key"]='sk-ant-[a-zA-Z0-9_-]{20,}'
+    ["HuggingFace token"]='hf_[a-zA-Z0-9]{20,}'
+    ["Docker auth (base64)"]='\"auth\":[[:space:]]*\"[A-Za-z0-9+/]{20,}={0,2}\"'
+    ["GitHub token"]='gh[pousr]_[A-Za-z0-9]{36,}'
+    ["Generic hex secret (32+ chars)"]='[0-9a-f]{32,}'
+    ["Generic high-entropy string"]='[A-Za-z0-9+/]{40,}={0,2}'
+)
+
+# Staged files that are text (not binary, not git-crypt encrypted).
+mapfile -t staged < <(git diff --cached --name-only --diff-filter=ACM)
+
+found=0
+for file in "${staged[@]}"; do
+    # Skip if file is not in the working tree (e.g. deleted)
+    [[ -f "$file" ]] || continue
+
+    # Skip binary / git-crypt encrypted files (they start with \x00GITCRYPT)
+    if head -c 10 "$file" | grep -qP '\x00GITCRYPT'; then
+        continue
+    fi
+
+    # Also skip if git detects it as binary
+    if git diff --cached -- "$file" | grep -qP '^Binary'; then
+        continue
+    fi
+
+    for label in "${!PATTERNS[@]}"; do
+        regex="${PATTERNS[$label]}"
+        # grep staged content (not working tree) for the pattern
+        if git show ":$file" 2>/dev/null | grep -qP "$regex"; then
+            echo -e "${RED}[pre-commit] Possible secret detected in $file${NC}"
+            echo -e "  ${YELLOW}Pattern: $label${NC}"
+            found=1
+        fi
+    done
+done
+
+if [[ "$found" -eq 1 ]]; then
+    echo ""
+    echo -e "${RED}Commit blocked: potential secrets found in staged files.${NC}"
+    echo "If these are intentional (e.g. a git-crypt protected file),"
+    echo "ensure the file is listed in .gitattributes, then commit again."
+    echo "To bypass (use with care): git commit --no-verify"
+    exit 1
+fi

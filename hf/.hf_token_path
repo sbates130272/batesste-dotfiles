@@ -1,9 +1,0 @@
-# This file records the expected path for the HuggingFace read token.
-# The actual token file is NOT tracked in git (it contains a secret).
-#
-# On a new machine:
-#   1. Obtain a HuggingFace read token from https://huggingface.co/settings/tokens
-#   2. Write it to:  ~/.batesste-hugging-face-read-march-2026.token
-#   3. The HF_TOKEN_FILE env var (set in .bashrc) will pick it up automatically.
-#
-# Token path: ~/.batesste-hugging-face-read-march-2026.token
