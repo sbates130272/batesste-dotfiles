@@ -77,12 +77,42 @@ expand_templates() {
         return
     fi
 
+    # If the file is still encrypted (binary/locked), sourcing it would fail.
+    if ! grep -qI '' "$secrets" 2>/dev/null; then
+        log "Skipping template expansion: ~/.secrets.env is still encrypted (run git-crypt unlock, then re-run install.sh)"
+        return
+    fi
+
     # Source secrets into a subshell so envsubst can see them, then write outputs.
     (
-        set -a
-        # shellcheck source=/dev/null
-        . "$secrets"
-        set +a
+        # Use eval-based export to handle values with spaces (e.g. HTTP header strings)
+        # that plain `set -a; . file` would misparse as commands.
+        while IFS= read -r line || [[ -n "$line" ]]; do
+            [[ "$line" =~ ^[[:space:]]*# ]] && continue
+            [[ -z "${line//[[:space:]]/}" ]] && continue
+            export "${line?}"
+        done < "$secrets"
+
+        local missing=()
+        local required=(
+            AWS_ACCESS_KEY_ID
+            AWS_SECRET_ACCESS_KEY
+            AWS_BATESSTE_PMEM_KEY_B64
+            DOCKER_AUTH
+            GH_TOKEN_STEBATES_AMDENG
+            GH_TOKEN_SBATES130272
+        )
+        for var in "${required[@]}"; do
+            [[ -z "${!var:-}" ]] && missing+=("$var")
+        done
+        if [[ ${#missing[@]} -gt 0 ]]; then
+            echo "[dotfiles] ERROR: secrets file is missing required variables:" >&2
+            for var in "${missing[@]}"; do
+                echo "  - $var" >&2
+            done
+            echo "[dotfiles] Re-run after fixing ~/.secrets.env (check git-crypt unlock status)" >&2
+            exit 1
+        fi
 
         install -d "$HOME/.config/gh"
         envsubst < "$tmpl_dir/gh-hosts.yml" > "$HOME/.config/gh/hosts.yml"
@@ -114,7 +144,7 @@ check_gpg_key() {
     if [[ -z "$fingerprint" ]]; then
         return  # can't determine key, skip check
     fi
-    if ! gpg --list-secret-keys "$fingerprint" &>/dev/null; then
+    if ! gpg --list-secret-keys "$fingerprint" &>/dev/null 2>&1; then
         echo ""
         echo "[dotfiles] WARNING: GPG private key $fingerprint is not available."
         echo "           git-crypt unlock and GPG commit signing will not work until"
@@ -131,7 +161,7 @@ post_install_reminders() {
     # git-crypt: secrets are encrypted in this repo — unlock before stowing.
     if git -C "$DOTFILES_DIR" crypt status 2>/dev/null | grep -q "not encrypted"; then
         : # unlocked, nothing to warn about
-    elif git -C "$DOTFILES_DIR" crypt status 2>/dev/null | grep -q "encrypted"; then
+    elif git -C "$DOTFILES_DIR" crypt status 2>/dev/null | grep -qv "not encrypted"; then
         echo ""
         echo "[dotfiles] ACTION REQUIRED: git-crypt secrets are still locked."
         echo "           Run: git-crypt unlock"
@@ -139,7 +169,7 @@ post_install_reminders() {
         warned=1
     fi
 
-    [[ "$warned" -eq 1 ]] && echo ""
+    if [[ "$warned" -eq 1 ]]; then echo ""; fi
 }
 
 main "$@"
