@@ -114,12 +114,6 @@ if [ -f "$HOME/.config/rocm/wsl-env.sh" ]; then
   . "$HOME/.config/rocm/wsl-env.sh"
 fi
 
-# Secrets (git-crypt encrypted, stowed from dotfiles)
-if [ -f "$HOME/.secrets.env" ]; then
-  set -a
-  . "$HOME/.secrets.env"
-  set +a
-fi
 
 export EDITOR=emacs
 export HF_HOME="$HOME/.cache/huggingface"
