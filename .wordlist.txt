@@ -30,3 +30,5 @@ CLI
 AWS
 pmem
 envsubst
+env
+natively

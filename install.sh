@@ -103,6 +103,7 @@ expand_templates() {
             GH_TOKEN_STEBATES_AMDENG
             GH_TOKEN_SBATES130272
             HF_TOKEN
+            OPENROUTER_API_KEY
         )
         for var in "${required[@]}"; do
             [[ -z "${!var:-}" ]] && missing+=("$var")
@@ -140,6 +141,11 @@ expand_templates() {
         printf '%s' "$HF_TOKEN" > "$HOME/.cache/huggingface/token"
         chmod 600 "$HOME/.cache/huggingface/token"
         log "Expanded huggingface/token"
+
+        install -d "$HOME/.config"
+        printf 'export OPENROUTER_API_KEY=%s\n' "$OPENROUTER_API_KEY" > "$HOME/.config/openrouter-env.sh"
+        chmod 600 "$HOME/.config/openrouter-env.sh"
+        log "Expanded openrouter-env.sh"
     )
 }
 
