@@ -22,10 +22,19 @@ declare -A PATTERNS=(
 # Staged files that are text (not binary, not git-crypt encrypted).
 mapfile -t staged < <(git diff --cached --name-only --diff-filter=ACM)
 
+# Files declared as git-crypt encrypted in .gitattributes — safe to skip
+# whether the repo is locked (binary blob) or unlocked (plaintext).
+mapfile -t git_crypt_files < <(git check-attr filter -- "${staged[@]}" 2>/dev/null | awk -F': ' '$3 == "git-crypt" {print $1}')
+declare -A git_crypt_set
+for f in "${git_crypt_files[@]}"; do git_crypt_set["$f"]=1; done
+
 found=0
 for file in "${staged[@]}"; do
     # Skip if file is not in the working tree (e.g. deleted)
     [[ -f "$file" ]] || continue
+
+    # Skip files managed by git-crypt (encrypted at rest, safe regardless of lock state)
+    [[ -n "${git_crypt_set[$file]:-}" ]] && continue
 
     # Skip binary / git-crypt encrypted files (they start with \x00GITCRYPT)
     if head -c 10 "$file" | grep -qP '\x00GITCRYPT'; then
