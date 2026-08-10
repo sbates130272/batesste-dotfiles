@@ -48,3 +48,23 @@ EOF
 
 chmod 600 "$SETTINGS"
 echo "Wrote $SETTINGS"
+
+# VS Code extension reads claudeCode.environmentVariables, not settings.local.json.
+VSCODE_SETTINGS="$HOME/.vscode-server/data/Machine/settings.json"
+if [[ -f "$VSCODE_SETTINGS" ]]; then
+    python3 - "$VSCODE_SETTINGS" "$ANTHROPIC_CUSTOM_HEADERS" "$ANTHROPIC_API_KEY" <<'PYEOF'
+import sys, json
+path, custom_headers, api_key = sys.argv[1], sys.argv[2], sys.argv[3]
+with open(path) as f:
+    s = json.load(f)
+s["claudeCode.environmentVariables"] = [
+    {"name": "ANTHROPIC_CUSTOM_HEADERS", "value": custom_headers},
+    {"name": "ANTHROPIC_API_KEY",        "value": api_key},
+    {"name": "NODE_EXTRA_CA_CERTS",      "value": "/etc/ssl/certs/ca-certificates.crt"},
+]
+with open(path, "w") as f:
+    json.dump(s, f, indent=4)
+    f.write("\n")
+PYEOF
+    echo "Updated $VSCODE_SETTINGS"
+fi
