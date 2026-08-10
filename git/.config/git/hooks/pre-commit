@@ -39,8 +39,9 @@ for file in "${staged[@]}"; do
 
     for label in "${!PATTERNS[@]}"; do
         regex="${PATTERNS[$label]}"
-        # grep staged content (not working tree) for the pattern
-        if git show ":$file" 2>/dev/null | grep -qP "$regex"; then
+        # Scan only added lines (+) in the staged diff, not the full file, to
+        # avoid false positives from pre-existing content like URLs.
+        if git diff --cached -- "$file" | grep -P '^\+[^+]' | grep -qP "$regex"; then
             echo -e "${RED}[pre-commit] Possible secret detected in $file${NC}"
             echo -e "  ${YELLOW}Pattern: $label${NC}"
             found=1

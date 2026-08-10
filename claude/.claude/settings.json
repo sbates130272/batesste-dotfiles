@@ -52,8 +52,7 @@
     "ask": [
       "Bash(git push:*)",
       "Bash(npm publish:*)",
-      "Bash(docker:*)",
-      "Bash(kubectl:*)"
+"Bash(kubectl:*)"
     ]
   },
   "hooks": {

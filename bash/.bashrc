@@ -114,6 +114,11 @@ if [ -f "$HOME/.config/rocm/wsl-env.sh" ]; then
   . "$HOME/.config/rocm/wsl-env.sh"
 fi
 
+# OpenRouter API key (written by install.sh from encrypted secrets)
+if [ -f "$HOME/.config/openrouter-env.sh" ]; then
+  . "$HOME/.config/openrouter-env.sh"
+fi
+
 
 export EDITOR=emacs
 export HF_HOME="$HOME/.cache/huggingface"

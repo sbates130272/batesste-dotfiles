@@ -64,6 +64,7 @@ main() {
     done
 
     expand_templates
+    run_host_bootstrap
     post_install_reminders
     log "Done."
 }
@@ -101,6 +102,8 @@ expand_templates() {
             DOCKER_AUTH
             GH_TOKEN_STEBATES_AMDENG
             GH_TOKEN_SBATES130272
+            HF_TOKEN
+            OPENROUTER_API_KEY
         )
         for var in "${required[@]}"; do
             [[ -z "${!var:-}" ]] && missing+=("$var")
@@ -133,7 +136,27 @@ expand_templates() {
         printf '%s' "$AWS_BATESSTE_PMEM_KEY_B64" | base64 -d > "$HOME/.aws/$pmem_name"
         chmod 600 "$HOME/.aws/$pmem_name"
         log "Expanded aws/$pmem_name"
+
+        install -d "$HOME/.cache/huggingface"
+        printf '%s' "$HF_TOKEN" > "$HOME/.cache/huggingface/token"
+        chmod 600 "$HOME/.cache/huggingface/token"
+        log "Expanded huggingface/token"
+
+        install -d "$HOME/.config"
+        printf 'export OPENROUTER_API_KEY=%s\n' "$OPENROUTER_API_KEY" > "$HOME/.config/openrouter-env.sh"
+        chmod 600 "$HOME/.config/openrouter-env.sh"
+        log "Expanded openrouter-env.sh"
     )
+}
+
+run_host_bootstrap() {
+    local host
+    host="$(hostname -s)"
+    local script="$DOTFILES_DIR/scripts/bootstrap-${host}.sh"
+    if [[ -x "$script" ]]; then
+        log "Running host bootstrap: $script"
+        "$script"
+    fi
 }
 
 check_gpg_key() {
