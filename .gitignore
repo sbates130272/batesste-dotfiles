@@ -9,6 +9,12 @@
 !secrets/
 !secrets/.secrets.env
 
+# expand_templates() outputs — written to $HOME, never inside the repo tree
+aws/.aws/credentials
+aws/.aws/*.pmem
+gh/.config/gh/hosts.yml
+
+
 # Claude — session and runtime state (not config)
 .claude/history.jsonl
 .claude/mcp-needs-auth-cache.json

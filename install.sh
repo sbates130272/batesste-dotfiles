@@ -74,14 +74,20 @@ expand_templates() {
     local tmpl_dir="$DOTFILES_DIR/templates"
 
     if [[ ! -f "$secrets" ]]; then
-        log "Skipping template expansion: ~/.secrets.env not found (run git-crypt unlock first)"
-        return
+        echo ""
+        echo "[dotfiles] ERROR: $secrets not found."
+        echo "           Run: git-crypt unlock"
+        echo "           Then re-run: ./install.sh"
+        exit 1
     fi
 
     # If the file is still encrypted (binary/locked), sourcing it would fail.
     if ! grep -qI '' "$secrets" 2>/dev/null; then
-        log "Skipping template expansion: ~/.secrets.env is still encrypted (run git-crypt unlock, then re-run install.sh)"
-        return
+        echo ""
+        echo "[dotfiles] ERROR: $secrets is still encrypted."
+        echo "           Run: git-crypt unlock"
+        echo "           Then re-run: ./install.sh"
+        exit 1
     fi
 
     # Source secrets into a subshell so envsubst can see them, then write outputs.
