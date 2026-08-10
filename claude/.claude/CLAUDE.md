@@ -21,3 +21,4 @@
 - Always GPG-sign commits; never skip hooks or signing
 - Prefer new commits over amending published commits
 - Confirm before: git push, force operations, branch deletion
+- When asked for a "commit message" or to "commit": write the message to /tmp/<repo-name>-commit-msg.txt and show the git command to use it. Never commit directly.

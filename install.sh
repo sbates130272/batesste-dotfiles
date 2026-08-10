@@ -64,6 +64,7 @@ main() {
     done
 
     expand_templates
+    run_host_bootstrap
     post_install_reminders
     log "Done."
 }
@@ -140,6 +141,16 @@ expand_templates() {
         chmod 600 "$HOME/.cache/huggingface/token"
         log "Expanded huggingface/token"
     )
+}
+
+run_host_bootstrap() {
+    local host
+    host="$(hostname -s)"
+    local script="$DOTFILES_DIR/scripts/bootstrap-${host}.sh"
+    if [[ -x "$script" ]]; then
+        log "Running host bootstrap: $script"
+        "$script"
+    fi
 }
 
 check_gpg_key() {
