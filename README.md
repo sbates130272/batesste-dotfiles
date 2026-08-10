@@ -60,9 +60,19 @@ Secrets are stored encrypted in this repo using [git-crypt](https://github.com/A
 | --- | --- |
 | `secrets/.secrets.env` | All secret values (`HF_TOKEN`, `DOCKER_PAT`, `DOCKER_AUTH`, `ANTHROPIC_API_KEY`, `ANTHROPIC_CUSTOM_HEADERS`, `OTEL_RESOURCE_ATTRIBUTES`, `GH_TOKEN_*`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_BATESSTE_PMEM_KEY_B64`) |
 
-`install.sh` uses `envsubst` to expand templates in `templates/` into `$HOME` after sourcing the secrets file. The AWS pmem key is stored base64-encoded and decoded by `install.sh` during expansion.
+`install.sh` uses `envsubst` to expand templates in `templates/` into `$HOME` after sourcing the secrets file. The AWS pmem key is stored base64-encoded and decoded by `install.sh` during expansion. `HF_TOKEN` is written directly to `~/.cache/huggingface/token`, which `huggingface_hub` reads natively — no shell env var sourcing required.
 
 Secrets are encrypted with git-crypt. Import your GPG private key before running `git-crypt unlock`.
+
+## Machine-local Claude settings
+
+`claude/settings.local.json` is excluded from stow (via `claude/.stow-local-ignore`) so each machine manages it independently. Use the bootstrap script to write the correct `settings.local.json` for a given machine:
+
+| Machine | Script | Notes |
+| --- | --- | --- |
+| `snoc-think` | `scripts/bootstrap-snoc-think.sh` | Bare Linux; reaches the AMD API gateway via SSH reverse tunnel on `localhost:8888` |
+
+On WSL2 (`apcan-*`), write `~/.claude/settings.local.json` by hand — it only needs local permission overrides and is not secret.
 
 ## Notes
 
