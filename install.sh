@@ -101,6 +101,7 @@ expand_templates() {
             DOCKER_AUTH
             GH_TOKEN_STEBATES_AMDENG
             GH_TOKEN_SBATES130272
+            HF_TOKEN
         )
         for var in "${required[@]}"; do
             [[ -z "${!var:-}" ]] && missing+=("$var")
@@ -133,6 +134,11 @@ expand_templates() {
         printf '%s' "$AWS_BATESSTE_PMEM_KEY_B64" | base64 -d > "$HOME/.aws/$pmem_name"
         chmod 600 "$HOME/.aws/$pmem_name"
         log "Expanded aws/$pmem_name"
+
+        install -d "$HOME/.cache/huggingface"
+        printf '%s' "$HF_TOKEN" > "$HOME/.cache/huggingface/token"
+        chmod 600 "$HOME/.cache/huggingface/token"
+        log "Expanded huggingface/token"
     )
 }
 
