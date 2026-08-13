@@ -1,26 +1,4 @@
 {
-  "env": {
-    "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
-    "OTEL_METRICS_EXPORTER": "otlp",
-    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
-    "OTEL_TRACES_EXPORTER": "otlp",
-    "OTEL_LOG_TOOL_DETAILS": "0",
-    "OTEL_LOG_RAW_API_BODIES": "0",
-    "OTEL_EXPORTER_OTLP_ENDPOINT": "https://collector.slug.amd.com",
-    "ANTHROPIC_BASE_URL": "https://llm-api.amd.com/Anthropic",
-    "OTEL_LOG_TOOL_CONTENT": "0",
-    "OTEL_LOG_USER_PROMPTS": "0",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL": "Claude-Sonnet-4.6",
-    "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
-    "CLAUDE_CODE_ENHANCED_TELEMETRY_BETA": "1",
-    "ANTHROPIC_MODEL": "Claude-Sonnet-4.6",
-    "CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS": "1",
-    "ANTHROPIC_DEFAULT_OPUS_MODEL": "Claude-Opus-4.8",
-    "OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE": "cumulative",
-    "ENABLE_TOOL_SEARCH": "true",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "Claude-Haiku-4.5",
-    "OTEL_LOGS_EXPORTER": "otlp"
-  },
   "permissions": {
     "allow": [
       "Bash(git status:*)",
@@ -29,7 +7,11 @@
       "Bash(ls:*)",
       "Bash(find:*)",
       "Bash(grep:*)",
-      "Read(**)"
+      "Read(**)",
+      "Bash(ss -tlnp)",
+      "Bash(netstat -tlnp)",
+      "Bash(ssh -f -N -R 8888:127.0.0.1:8888 snoc-think)",
+      "Bash(docker:*)"
     ],
     "deny": [
       "Read(./.env)",

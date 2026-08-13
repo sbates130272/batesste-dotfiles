@@ -1,5 +1,6 @@
-# Ignore stow backup files
-*.stow-local-ignore
+# Ignore editor/stow backup files.
+# NB: do NOT glob *.stow-local-ignore here — it matches .stow-local-ignore
+# itself, which must be tracked so stow honours it on every machine.
 *~
 
 # Secrets — never commit these (git-crypt handles specific tracked secret files)
@@ -15,21 +16,28 @@ aws/.aws/*.pmem
 gh/.config/gh/hosts.yml
 
 
-# Claude — session and runtime state (not config)
-.claude/history.jsonl
-.claude/mcp-needs-auth-cache.json
-.claude/backups/
-.claude/downloads/
-.claude/file-history/
-.claude/plans/
-.claude/plugins/
-.claude/projects/
-.claude/session-env/
-.claude/sessions/
-.claude/shell-snapshots/
-.claude/ide/
-.claude/hooks/claude-notifier-active.d/
-.claude/hooks/claude-notifier-task-start/
-.claude/hooks/claude-notifier-focus
-.claude/hooks/claude-notifier-muted
-.claude/hooks/claude-signal
+# Claude — session and runtime state (not config).
+# Paths are relative to the repo root, so they must include the stow package
+# prefix; bare .claude/... never matches anything inside claude/.
+claude/.claude/history.jsonl
+claude/.claude/mcp-needs-auth-cache.json
+claude/.claude/backups/
+claude/.claude/downloads/
+claude/.claude/file-history/
+claude/.claude/plans/
+claude/.claude/plugins/
+claude/.claude/projects/
+claude/.claude/session-env/
+claude/.claude/sessions/
+claude/.claude/shell-snapshots/
+claude/.claude/ide/
+claude/.claude/hooks/claude-notifier-active.d/
+claude/.claude/hooks/claude-notifier-task-start/
+claude/.claude/hooks/claude-notifier-focus
+claude/.claude/hooks/claude-notifier-muted
+claude/.claude/hooks/claude-signal
+
+# Machine-local Claude settings: written per host by scripts/bootstrap-<host>.sh
+# from templates/claude-settings-local.json. Holds the APIM subscription key,
+# so it must never be committed, and .stow-local-ignore keeps stow off it.
+claude/.claude/settings.local.json
