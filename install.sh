@@ -31,14 +31,17 @@ stow_package() {
 }
 
 usage() {
-    echo "Usage: $0 [packages...]"
+    echo "Usage: $0 [--bootstrap] [packages...]"
+    echo ""
+    echo "Options:"
+    echo "  --bootstrap   Run the host bootstrap script after stowing (scripts/bootstrap-<hostname>.sh)"
     echo ""
     echo "Available packages:"
     for d in "$DOTFILES_DIR"/*/; do
         echo "  $(basename "$d")"
     done
     echo ""
-    echo "With no arguments, installs all packages."
+    echo "With no arguments, installs all packages without running bootstrap."
 }
 
 main() {
@@ -49,7 +52,17 @@ main() {
         exit 0
     fi
 
-    local packages=("$@")
+    local do_bootstrap=0
+    local args=()
+    for arg in "$@"; do
+        if [[ "$arg" == "--bootstrap" ]]; then
+            do_bootstrap=1
+        else
+            args+=("$arg")
+        fi
+    done
+
+    local packages=("${args[@]+"${args[@]}"}")
 
     if [[ ${#packages[@]} -eq 0 ]]; then
         # Install all packages (skip hidden dirs and non-directories)
@@ -64,7 +77,9 @@ main() {
     done
 
     expand_templates
-    run_host_bootstrap
+    if [[ "$do_bootstrap" -eq 1 ]]; then
+        run_host_bootstrap
+    fi
     post_install_reminders
     log "Done."
 }
