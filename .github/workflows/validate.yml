@@ -35,20 +35,38 @@ jobs:
 
       - name: Check plaintext files contain no secrets
         run: |
+          # Globbed rather than listed by name: the previous hardcoded list went
+          # stale the moment a template was added, and a file that is silently
+          # never scanned is worse than no check at all.
+          #
+          # Live token shapes only. envsubst placeholders like ${VAR} must not match.
+          patterns='sk-ant-[A-Za-z0-9_-]{8}'
+          patterns="$patterns|hf_[A-Za-z0-9]{10}"
+          patterns="$patterns|gh[pousr]_[A-Za-z0-9]{10}"
+          patterns="$patterns|dckr_pat_[A-Za-z0-9_-]{8}"
+          patterns="$patterns|AKIA[0-9A-Z]{16}"
+          # AMD API gateway key: 32 hex digits following the header name.
+          patterns="$patterns|Ocp-Apim-Subscription-Key:[[:space:]]*[0-9a-fA-F]{32}"
+
           failed=0
-          for f in \
-              claude/.claude/settings.json \
-              templates/gh-hosts.yml \
-              templates/docker-config.json; do
+          checked=0
+          for f in claude/.claude/*.json templates/*; do
             [ -f "$f" ] || continue
-            # Reject real token values; allow envsubst placeholders (${VAR})
-            if grep -qP '(sk-ant-|hf_[A-Za-z0-9]{10}|ghp_[A-Za-z0-9]{10}|dckr_pat_)[^\s"]+' "$f"; then
+            checked=$((checked + 1))
+            if grep -qEi "$patterns" "$f"; then
               echo "ERROR: $f appears to contain a live secret."
               failed=1
             else
               echo "OK: $f"
             fi
           done
+
+          # A glob that matches nothing would make this step pass vacuously.
+          if [ "$checked" -eq 0 ]; then
+            echo "ERROR: no files matched the scan globs — paths must be wrong."
+            exit 1
+          fi
+          echo "Scanned $checked file(s)."
           exit $failed
 
   stow-structure:

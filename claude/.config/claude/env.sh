@@ -1,4 +1,8 @@
+# shellcheck shell=sh
 # Claude Code gateway + telemetry environment.
+#
+# Sourced, never executed, so there is no shebang; .profile may be read by a
+# POSIX sh, so keep this file to plain exports.
 #
 # These live here rather than in ~/.claude/settings.json because third-party
 # installers (.pixel-agents) rewrite settings.json from scratch, replacing the
