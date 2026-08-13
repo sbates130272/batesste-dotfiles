@@ -24,3 +24,8 @@ fi
 if [ -f "$HOME/.config/rocm/wsl-env.sh" ]; then
   . "$HOME/.config/rocm/wsl-env.sh"
 fi
+
+# Claude Code gateway env (also sourced from .bashrc; harmless if repeated)
+if [ -f "$HOME/.config/claude/env.sh" ]; then
+  . "$HOME/.config/claude/env.sh"
+fi

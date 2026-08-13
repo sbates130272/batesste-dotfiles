@@ -1,0 +1,16 @@
+{
+  "env": {
+    "HTTP_PROXY": "${CLAUDE_PROXY_URL}",
+    "HTTPS_PROXY": "${CLAUDE_PROXY_URL}",
+    "NO_PROXY": "localhost,127.0.0.1",
+    "NODE_EXTRA_CA_CERTS": "/etc/ssl/certs/ca-certificates.crt",
+    "ANTHROPIC_CUSTOM_HEADERS": "${ANTHROPIC_CUSTOM_HEADERS}",
+    "ANTHROPIC_API_KEY": "${ANTHROPIC_API_KEY}"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(netstat -tlnp)",
+      "Bash(ss -tlnp)"
+    ]
+  }
+}

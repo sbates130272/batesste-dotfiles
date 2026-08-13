@@ -55,6 +55,30 @@ stow_package() {
     fi
 }
 
+# Third-party installers (.pixel-agents) rewrite ~/.claude/settings.json from
+# scratch, replacing the stow symlink with a plain file and dropping everything
+# they did not author. Detect that and re-link, keeping a copy of whatever they
+# wrote so its hooks can be merged back by hand.
+heal_claude_settings() {
+    local target="$HOME/.claude/settings.json"
+    local src="$DOTFILES_DIR/claude/.claude/settings.json"
+
+    [[ -f "$src" ]] || return 0
+    [[ -e "$target" || -L "$target" ]] || return 0
+
+    if [[ -L "$target" && "$(readlink -f "$target")" == "$(readlink -f "$src")" ]]; then
+        return 0
+    fi
+
+    local stamp
+    stamp="${_DATESTAMP:-$(date +%Y%m%d_%H%M%S)}"
+    log "WARNING: $target is not the stow symlink — a third-party installer likely replaced it."
+    log "Backing up $target -> ${target}.clobbered.${stamp}"
+    mv "$target" "${target}.clobbered.${stamp}"
+    ln -s "$(realpath --relative-to="$HOME/.claude" "$src")" "$target"
+    log "Re-linked $target"
+}
+
 usage() {
     echo "Usage: $0 [--bootstrap] [--force] [packages...]"
     echo ""
@@ -105,6 +129,7 @@ main() {
         stow_package "$pkg"
     done
 
+    heal_claude_settings
     expand_templates
     if [[ "$do_bootstrap" -eq 1 ]]; then
         run_host_bootstrap
