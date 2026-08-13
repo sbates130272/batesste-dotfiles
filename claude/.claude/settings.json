@@ -10,7 +10,8 @@
       "Read(**)",
       "Bash(ss -tlnp)",
       "Bash(netstat -tlnp)",
-      "Bash(ssh -f -N -R 8888:127.0.0.1:8888 snoc-think)"
+      "Bash(ssh -f -N -R 8888:127.0.0.1:8888 snoc-think)",
+      "Bash(docker:*)"
     ],
     "deny": [
       "Read(./.env)",
