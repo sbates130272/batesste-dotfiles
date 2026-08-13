@@ -3,6 +3,9 @@ set -euo pipefail
 
 DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+_DO_FORCE=0
+_DATESTAMP=""
+
 log() { echo "[dotfiles] $*"; }
 
 check_deps() {
@@ -20,9 +23,31 @@ check_deps() {
     fi
 }
 
+backup_conflicts() {
+    local pkg="$1"
+    local pkg_dir="$DOTFILES_DIR/$pkg"
+
+    while IFS= read -r -d '' src; do
+        local rel="${src#"$pkg_dir/"}"
+        local target="$HOME/$rel"
+        if [[ -f "$target" && ! -L "$target" ]]; then
+            log "Backing up $target -> ${target}.${_DATESTAMP}"
+            mv "$target" "${target}.${_DATESTAMP}"
+        elif [[ -L "$target" ]]; then
+            local resolved
+            resolved="$(readlink -f "$target" 2>/dev/null || true)"
+            if [[ "$resolved" != "$(readlink -f "$src")" ]]; then
+                log "Backing up $target -> ${target}.${_DATESTAMP}"
+                mv "$target" "${target}.${_DATESTAMP}"
+            fi
+        fi
+    done < <(find "$pkg_dir" -type f -print0)
+}
+
 stow_package() {
     local pkg="$1"
     if [[ -d "$DOTFILES_DIR/$pkg" ]]; then
+        [[ "$_DO_FORCE" -eq 1 ]] && backup_conflicts "$pkg"
         log "Stowing $pkg"
         stow --dir="$DOTFILES_DIR" --target="$HOME" --restow "$pkg"
     else
@@ -31,10 +56,11 @@ stow_package() {
 }
 
 usage() {
-    echo "Usage: $0 [--bootstrap] [packages...]"
+    echo "Usage: $0 [--bootstrap] [--force] [packages...]"
     echo ""
     echo "Options:"
     echo "  --bootstrap   Run the host bootstrap script after stowing (scripts/bootstrap-<hostname>.sh)"
+    echo "  --force       Back up conflicting files before stowing (backup extension: .YYYYMMDD_HHMMSS)"
     echo ""
     echo "Available packages:"
     for d in "$DOTFILES_DIR"/*/; do
@@ -57,6 +83,9 @@ main() {
     for arg in "$@"; do
         if [[ "$arg" == "--bootstrap" ]]; then
             do_bootstrap=1
+        elif [[ "$arg" == "--force" ]]; then
+            _DO_FORCE=1
+            _DATESTAMP="$(date +%Y%m%d_%H%M%S)"
         else
             args+=("$arg")
         fi
