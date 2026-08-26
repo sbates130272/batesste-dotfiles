@@ -1,27 +1,34 @@
 {
   "taskCompleted": {
     "level": "popup",
-    "sound": "Hero"
+    "sound": "Hero",
+    "label": "✅ finished"
   },
   "needsPermission": {
     "level": "popup",
-    "sound": "Glass"
+    "sound": "Glass",
+    "label": "❗ needs permission"
   },
   "asksQuestion": {
     "level": "popup",
-    "sound": "Funk"
+    "sound": "Funk",
+    "label": "❓ question"
   },
   "userPromptSubmit": {
     "level": "sound+popup",
-    "sound": ""
+    "sound": "",
+    "label": ""
   },
   "subagentCompleted": {
     "level": "off",
-    "sound": "Pop"
+    "sound": "Pop",
+    "label": "✅ subagent finished"
   },
   "soundVolume": 1,
   "minTaskDurationThreshold": 10,
   "suppressSubagentInteractions": true,
+  "showChatTitle": true,
+  "showDetail": true,
   "remoteAudio": {
     "enabled": true,
     "port": 47291
