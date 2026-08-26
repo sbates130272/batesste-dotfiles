@@ -1,8 +1,6 @@
 name: Integration
 
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
 
@@ -33,7 +31,17 @@ jobs:
             stow git git-crypt gettext-base \
             emacs-nox \
             ansible \
-            awscli
+            python3-pip unzip curl
+
+      - name: Install AWS CLI v2
+        run: |
+          # awscli apt package was dropped from Ubuntu 24.04+; use the official
+          # installer which works consistently across all matrix runners.
+          curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+          unzip -q /tmp/awscliv2.zip -d /tmp
+          sudo /tmp/aws/install
+          rm -rf /tmp/awscliv2.zip /tmp/aws
+          aws --version
 
       - name: Install gh CLI
         run: |
@@ -189,17 +197,16 @@ jobs:
           fi
 
       # ── GitHub CLI ──────────────────────────────────────────────────────────
-      # Tests that the expanded hosts.yml is valid and the real token works.
-      # GH_TOKEN_STEBATES_AMDENG must be a current fine-grained PAT stored as a
-      # repo secret.  gh reads ~/.config/gh/hosts.yml for the oauth_token, so
-      # we just need GH_CONFIG_DIR to point at the right place.
-      - name: gh auth status (stebates_amdeng)
+      # Tests that the expanded hosts.yml is valid and the real tokens work.
+      # gh reads ~/.config/gh/hosts.yml which install.sh expanded from the
+      # unlocked secrets. We test via sbates130272 because stebates_amdeng is
+      # an AMD enterprise account whose IP allowlist blocks GitHub Actions runners.
+      - name: gh auth status
         run: |
-          # gh defaults to ~/.config/gh which install put hosts.yml into
           gh auth status --hostname github.com
           echo "OK: gh auth status passed"
 
-      - name: gh API smoke test
+      - name: gh API smoke test (sbates130272)
         run: |
           login="$(gh api user --jq .login)"
           echo "Authenticated as: $login"

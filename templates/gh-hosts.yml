@@ -5,5 +5,5 @@ github.com:
         sbates130272:
             oauth_token: ${GH_TOKEN_SBATES130272}
     git_protocol: ssh
-    user: stebates_amdeng
-    oauth_token: ${GH_TOKEN_STEBATES_AMDENG}
+    user: sbates130272
+    oauth_token: ${GH_TOKEN_SBATES130272}
