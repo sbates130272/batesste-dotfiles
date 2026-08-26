@@ -9,6 +9,10 @@
 *secret*
 !secrets/
 !secrets/.secrets.env
+# CI workflows are named for what they scan for, not what they contain. Without
+# this, *secret* silently swallowed .github/workflows/secret-scan.yml, which
+# never reached origin and so never ran.
+!.github/workflows/*.yml
 
 # expand_templates() outputs — written to $HOME, never inside the repo tree
 aws/.aws/credentials

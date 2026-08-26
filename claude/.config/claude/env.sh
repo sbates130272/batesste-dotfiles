@@ -4,6 +4,11 @@
 # Sourced, never executed, so there is no shebang; .profile may be read by a
 # POSIX sh, so keep this file to plain exports.
 #
+# Reaches login shells via .profile and interactive shells via .bashrc. It does
+# NOT reach `bash -c`, which reads neither, so anything launching Claude Code
+# without a login shell (the VS Code extension) needs these set separately --
+# see claudeCode.environmentVariables in scripts/bootstrap-<host>.sh.
+#
 # These live here rather than in ~/.claude/settings.json because third-party
 # installers (.pixel-agents) rewrite settings.json from scratch, replacing the
 # stow symlink and dropping its env block. Keeping the gateway config in the
