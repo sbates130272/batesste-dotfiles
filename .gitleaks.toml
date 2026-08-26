@@ -1,0 +1,11 @@
+[[allowlists]]
+  description = "GPG signing key fingerprint in gitconfig — 40 hex chars, not a secret"
+  paths = ['''git/\.gitconfig''']
+  regexTarget = "line"
+  regexes = ['''signingkey\s*=\s*[0-9A-Fa-f]{40}''']
+
+[[allowlists]]
+  description = "CI stub base64 value in integration workflow — fake, not a real key"
+  paths = ['''\.github/workflows/integration\.yml''']
+  regexTarget = "line"
+  regexes = ['''AWS_BATESSTE_PMEM_KEY_B64=''']

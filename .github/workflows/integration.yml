@@ -1,0 +1,163 @@
+name: Integration
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: integration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  install-smoke:
+    name: install and smoke-test on Ubuntu 24.04
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: sudo apt-get update -q && sudo apt-get install -y -q stow git git-crypt gettext-base
+
+      - name: Stub secrets for CI
+        run: |
+          # The repo's secrets/.secrets.env is a git-crypt binary blob in CI.
+          # Replace it with a plaintext stub so check_secrets_unlocked() passes
+          # and expand_templates() can run. Values are fake — just non-empty so
+          # the required-variable check passes. AWS_BATESSTE_PMEM_KEY_B64 must
+          # be valid base64 because install.sh pipes it through base64 -d.
+          # Values are structurally valid but use prefixes that no real token
+          # issuer uses, so gitleaks and the pre-commit hook stay quiet.
+          {
+            echo 'AWS_ACCESS_KEY_ID=CI_FAKE_ACCESS_KEY_ID'
+            echo 'AWS_SECRET_ACCESS_KEY=CI_FAKE_SECRET_ACCESS_KEY'
+            echo 'AWS_BATESSTE_PMEM_KEY_B64=dGVzdC1wbWVtLWtleQ=='
+            echo 'DOCKER_AUTH=dXNlcjpwYXNz'
+            echo 'GH_TOKEN_STEBATES_AMDENG=ci_fake_github_token_amdeng'
+            echo 'GH_TOKEN_SBATES130272=ci_fake_github_token_sbates'
+            echo 'HF_TOKEN=ci_fake_huggingface_token'
+            echo 'OPENROUTER_API_KEY=ci_fake_openrouter_key'
+          } > secrets/.secrets.env
+
+      - name: Run install
+        run: ./install.sh --force
+
+      - name: Verify stow symlinks
+        run: |
+          failed=0
+          check_link() {
+            local link="$1" target_prefix="$2"
+            if [ ! -e "$link" ]; then
+              echo "ERROR: $link does not exist"
+              failed=1
+              return
+            fi
+            # stow folds a package subdir into a single symlink when nothing
+            # else lives there, so the symlink may be on a parent directory
+            # rather than the file itself. Walk up until we find the symlink.
+            local check="$link"
+            while [ "$check" != "/" ] && [ ! -L "$check" ]; do
+              check="$(dirname "$check")"
+            done
+            if [ ! -L "$check" ]; then
+              echo "ERROR: $link — no symlink found in path (stow did not link it)"
+              failed=1
+              return
+            fi
+            resolved="$(readlink -f "$check")"
+            if [ "${resolved#"$target_prefix"}" = "$resolved" ]; then
+              echo "ERROR: $link -> $resolved (does not point into $target_prefix)"
+              failed=1
+              return
+            fi
+            echo "OK: $link -> $resolved"
+          }
+          REPO="$PWD"
+          check_link "$HOME/.bashrc"              "$REPO"
+          check_link "$HOME/.profile"             "$REPO"
+          check_link "$HOME/.gitconfig"           "$REPO"
+          check_link "$HOME/.config/git/hooks/pre-commit" "$REPO"
+          check_link "$HOME/.claude/hooks"         "$REPO"
+          check_link "$HOME/.config/gh/config.yml" "$REPO"
+          check_link "$HOME/.aws/config"          "$REPO"
+          check_link "$HOME/.ssh/config"          "$REPO"
+          check_link "$HOME/.emacs"               "$REPO"
+          exit $failed
+
+      - name: Verify template expansions
+        run: |
+          failed=0
+          check_file() {
+            local f="$1"
+            if [ ! -f "$f" ]; then
+              echo "ERROR: $f was not created"
+              failed=1
+            else
+              echo "OK: $f"
+            fi
+          }
+          check_file "$HOME/.config/gh/hosts.yml"
+          check_file "$HOME/.docker/config.json"
+          check_file "$HOME/.aws/credentials"
+          check_file "$HOME/.cache/huggingface/token"
+          check_file "$HOME/.config/openrouter-env.sh"
+          # Expanded files must not contain un-substituted placeholders
+          for f in "$HOME/.config/gh/hosts.yml" "$HOME/.docker/config.json" "$HOME/.aws/credentials"; do
+            if grep -q '\${' "$f" 2>/dev/null; then
+              echo "ERROR: $f still contains un-expanded placeholders"
+              failed=1
+            fi
+          done
+          exit $failed
+
+      - name: Verify file permissions on secrets
+        run: |
+          failed=0
+          check_mode() {
+            local f="$1" want="$2"
+            got="$(stat -c '%a' "$f" 2>/dev/null || echo missing)"
+            if [ "$got" != "$want" ]; then
+              echo "ERROR: $f permissions $got (want $want)"
+              failed=1
+            else
+              echo "OK: $f mode $got"
+            fi
+          }
+          check_mode "$HOME/.config/gh/hosts.yml"       600
+          check_mode "$HOME/.docker/config.json"        600
+          check_mode "$HOME/.aws/credentials"           600
+          check_mode "$HOME/.cache/huggingface/token"   600
+          check_mode "$HOME/.config/openrouter-env.sh"  600
+          exit $failed
+
+      - name: Shell files parse cleanly
+        run: |
+          failed=0
+          for f in \
+            "$HOME/.bashrc" \
+            "$HOME/.profile" \
+            "$HOME/.config/claude/env.sh" \
+            "$HOME/.config/git/hooks/pre-commit"
+          do
+            if bash -n "$f" 2>&1; then
+              echo "OK: $f"
+            else
+              echo "ERROR: $f failed bash -n"
+              failed=1
+            fi
+          done
+          exit $failed
+
+      - name: Pre-commit hook is executable
+        run: |
+          f="$HOME/.config/git/hooks/pre-commit"
+          if [ -x "$f" ]; then
+            echo "OK: $f is executable"
+          else
+            echo "ERROR: $f is not executable"
+            exit 1
+          fi

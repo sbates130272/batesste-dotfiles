@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DOTFILES_DIR="${DOTFILES_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 
 _DO_FORCE=0
 _DATESTAMP=""
@@ -9,7 +9,39 @@ _OLD_ROOT=""
 _STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles"
 _STATE_FILE="$_STATE_DIR/install-state"
 
+# Top-level directories that are not stow packages. templates/ holds
+# envsubst inputs consumed by expand_templates() and scripts/ is run from the
+# repo; stowing either drops its contents straight into $HOME, which is how
+# ~/aws-credentials and friends appeared.
+_NON_PACKAGES=(templates scripts)
+
 log() { echo "[dotfiles] $*"; }
+
+is_package() {
+    local candidate="$1" np
+    for np in "${_NON_PACKAGES[@]}"; do
+        [[ "$candidate" == "$np" ]] && return 1
+    done
+    return 0
+}
+
+check_secrets_unlocked() {
+    local secrets_src="$DOTFILES_DIR/secrets/.secrets.env"
+
+    # If secrets/ is not in the repo at all, nothing to check.
+    [[ -d "$DOTFILES_DIR/secrets" ]] || return 0
+
+    # git-crypt leaves encrypted files as binary blobs. grep -qI tests whether
+    # the file contains only printable text; failure means it is still locked.
+    if [[ ! -f "$secrets_src" ]] || ! grep -qI '' "$secrets_src" 2>/dev/null; then
+        echo ""
+        echo "[dotfiles] ERROR: secrets/.secrets.env is still encrypted (git-crypt is locked)."
+        echo "           Run:   git-crypt unlock"
+        echo "           Then re-run: ./install.sh"
+        echo ""
+        exit 1
+    fi
+}
 
 check_deps() {
     local missing=()
@@ -33,6 +65,17 @@ backup_conflicts() {
     while IFS= read -r -d '' src; do
         local rel="${src#"$pkg_dir/"}"
         local target="$HOME/$rel"
+
+        # When stow folds a package subdirectory into a single symlink,
+        # $HOME/<rel> resolves *through* it to the package file itself. That
+        # file is not a symlink, so the -f test below would treat it as a
+        # conflict and mv the repo's own file out to a .<stamp> backup.
+        local resolved_target
+        resolved_target="$(readlink -f "$target" 2>/dev/null || true)"
+        if [[ -n "$resolved_target" && "$resolved_target" == "$DOTFILES_DIR"/* ]]; then
+            continue
+        fi
+
         if [[ -f "$target" && ! -L "$target" ]]; then
             log "Backing up $target -> ${target}.${_DATESTAMP}"
             mv "$target" "${target}.${_DATESTAMP}"
@@ -212,6 +255,10 @@ record_install() {
 
 stow_package() {
     local pkg="$1"
+    if ! is_package "$pkg"; then
+        log "Refusing to stow $pkg (not a stow package; its contents belong in the repo)"
+        return 0
+    fi
     if [[ -d "$DOTFILES_DIR/$pkg" ]]; then
         [[ "$_DO_FORCE" -eq 1 ]] && backup_conflicts "$pkg"
         log "Stowing $pkg"
@@ -260,7 +307,7 @@ usage() {
     echo ""
     echo "Available packages:"
     for d in "$DOTFILES_DIR"/*/; do
-        echo "  $(basename "$d")"
+        is_package "$(basename "$d")" && echo "  $(basename "$d")"
     done
     echo ""
     echo "With no arguments, installs all packages without running bootstrap."
@@ -268,6 +315,7 @@ usage() {
 
 main() {
     check_deps
+    check_secrets_unlocked
 
     if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
         usage
@@ -276,6 +324,7 @@ main() {
 
     local do_bootstrap=0
     local args=()
+    local pkg_name
     for arg in "$@"; do
         if [[ "$arg" == "--bootstrap" ]]; then
             do_bootstrap=1
@@ -290,9 +339,10 @@ main() {
     local packages=("${args[@]+"${args[@]}"}")
 
     if [[ ${#packages[@]} -eq 0 ]]; then
-        # Install all packages (skip hidden dirs and non-directories)
+        # Install all packages (skip hidden dirs, non-directories, non-packages)
         while IFS= read -r -d '' dir; do
-            packages+=("$(basename "$dir")")
+            pkg_name="$(basename "$dir")"
+            is_package "$pkg_name" && packages+=("$pkg_name")
         done < <(find "$DOTFILES_DIR" -maxdepth 1 -mindepth 1 -type d -not -name '.*' -print0 | sort -z)
     fi
 
@@ -449,4 +499,4 @@ post_install_reminders() {
     if [[ "$warned" -eq 1 ]]; then echo ""; fi
 }
 
-main "$@"
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then main "$@"; fi

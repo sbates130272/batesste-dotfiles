@@ -50,11 +50,26 @@ for file in "${staged[@]}"; do
         regex="${PATTERNS[$label]}"
         # Scan only added lines (+) in the staged diff, not the full file, to
         # avoid false positives from pre-existing content like URLs.
-        if git diff --cached -- "$file" | grep -P '^\+[^+]' | grep -qP "$regex"; then
-            echo -e "${RED}[pre-commit] Possible secret detected in $file${NC}"
-            echo -e "  ${YELLOW}Pattern: $label${NC}"
-            found=1
-        fi
+        matches="$(git diff --cached -- "$file" | grep -P '^\+[^+]' | grep -oP "$regex" || true)"
+        [[ -z "$matches" ]] && continue
+
+        # Discard matches with no actual entropy. Git's null SHA is forty
+        # zeros, which satisfies both the hex and high-entropy patterns while
+        # being the one string guaranteed not to be a secret. Anything that is
+        # a single character repeated is a placeholder, not a credential.
+        matches="$(printf '%s\n' "$matches" | grep -vP '^(.)\1*$' || true)"
+        [[ -z "$matches" ]] && continue
+
+        # Discard matches that appear inside a URL on the same line. Secrets
+        # are values, not URL path components — badge/shield URLs in Markdown
+        # are the canonical false-positive source for the high-entropy pattern.
+        url_lines="$(git diff --cached -- "$file" | grep -P '^\+[^+]' | grep -oP 'https?://\S+' | grep -oP "$regex" || true)"
+        matches="$(comm -23 <(printf '%s\n' "$matches" | sort) <(printf '%s\n' "$url_lines" | sort) || true)"
+        [[ -z "$matches" ]] && continue
+
+        echo -e "${RED}[pre-commit] Possible secret detected in $file${NC}"
+        echo -e "  ${YELLOW}Pattern: $label${NC}"
+        found=1
     done
 done
 

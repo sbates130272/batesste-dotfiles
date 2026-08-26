@@ -2,9 +2,9 @@
 # see /usr/share/doc/bash/examples/startup-files (in the package bash-doc)
 # for examples
 
-# Claude Code gateway env. Sourced above the interactivity guard so that
-# non-interactive shells (VS Code remote, `ssh host cmd`) reach the AMD
-# gateway too.
+# Claude Code gateway env, above the interactivity guard so that shells which
+# read .bashrc without being interactive still get it. Note this does not cover
+# `bash -c`, which reads no startup file at all.
 if [ -f "$HOME/.config/claude/env.sh" ]; then
   . "$HOME/.config/claude/env.sh"
 fi

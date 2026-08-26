@@ -1,5 +1,15 @@
 # batesste-dotfiles
 
+[![Validate](https://github.com/sbates130272/batesste-dotfiles/actions/workflows/validate.yml/badge.svg)](https://github.com/sbates130272/batesste-dotfiles/actions/workflows/validate.yml)
+[![Integration](https://github.com/sbates130272/batesste-dotfiles/actions/workflows/integration.yml/badge.svg)](https://github.com/sbates130272/batesste-dotfiles/actions/workflows/integration.yml)
+[![Install Check](https://github.com/sbates130272/batesste-dotfiles/actions/workflows/install-check.yml/badge.svg)](https://github.com/sbates130272/batesste-dotfiles/actions/workflows/install-check.yml)
+[![Secret Scan](https://github.com/sbates130272/batesste-dotfiles/actions/workflows/secret-scan.yml/badge.svg)](https://github.com/sbates130272/batesste-dotfiles/actions/workflows/secret-scan.yml)
+[![Shell Check](https://github.com/sbates130272/batesste-dotfiles/actions/workflows/shellcheck.yml/badge.svg)](https://github.com/sbates130272/batesste-dotfiles/actions/workflows/shellcheck.yml)
+[![Spellcheck](https://github.com/sbates130272/batesste-dotfiles/actions/workflows/spellcheck.yml/badge.svg)](https://github.com/sbates130272/batesste-dotfiles/actions/workflows/spellcheck.yml)
+[![Release](https://github.com/sbates130272/batesste-dotfiles/actions/workflows/release.yml/badge.svg)](https://github.com/sbates130272/batesste-dotfiles/actions/workflows/release.yml)
+[![Latest Release](https://img.shields.io/github/v/release/sbates130272/batesste-dotfiles)](https://github.com/sbates130272/batesste-dotfiles/releases/latest)
+[![License](https://img.shields.io/github/license/sbates130272/batesste-dotfiles)](LICENSE)
+
 Personal dotfiles for Stephen Bates, managed with [GNU Stow](https://www.gnu.org/software/stow/).
 
 ## Structure

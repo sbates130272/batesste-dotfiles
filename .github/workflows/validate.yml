@@ -80,17 +80,46 @@ jobs:
 
       - name: Dry-run stow for all packages
         run: |
+          # Derived rather than hardcoded, and kept in step with install.sh's
+          # _NON_PACKAGES. The old fixed list silently omitted ansible and aws,
+          # so new packages got no dry-run coverage at all.
           DOTFILES_DIR="$PWD"
           TARGET="$(mktemp -d)"
           failed=0
-          for pkg in bash claude emacs gh git secrets ssh; do
-            if [ -d "$DOTFILES_DIR/$pkg" ]; then
-              echo "Checking $pkg..."
-              stow --dir="$DOTFILES_DIR" --target="$TARGET" --simulate "$pkg" || {
-                echo "ERROR: stow dry-run failed for $pkg"
-                failed=1
-              }
-            fi
+          checked=0
+          for dir in "$DOTFILES_DIR"/*/; do
+            pkg="$(basename "$dir")"
+            case "$pkg" in
+              templates|scripts) continue ;;
+            esac
+            echo "Checking $pkg..."
+            checked=$((checked + 1))
+            stow --dir="$DOTFILES_DIR" --target="$TARGET" --simulate "$pkg" || {
+              echo "ERROR: stow dry-run failed for $pkg"
+              failed=1
+            }
           done
           rm -rf "$TARGET"
+          if [ "$checked" -eq 0 ]; then
+            echo "ERROR: no packages were checked."
+            exit 1
+          fi
+          echo "Dry-ran $checked package(s)."
+          exit $failed
+
+      - name: install.sh must not stow templates/ or scripts/
+        run: |
+          # These hold envsubst inputs and repo-run scripts. Stowing either
+          # drops its contents into $HOME, which is how ~/aws-credentials,
+          # ~/gh-hosts.yml and ~/docker-config.json appeared.
+          failed=0
+          for pkg in templates scripts; do
+            [ -d "$pkg" ] || continue
+            if ! grep -q "_NON_PACKAGES=(.*$pkg" install.sh; then
+              echo "ERROR: $pkg/ is not listed in install.sh _NON_PACKAGES."
+              failed=1
+            else
+              echo "OK: $pkg/ excluded from stow"
+            fi
+          done
           exit $failed
