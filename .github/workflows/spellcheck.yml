@@ -1,12 +1,6 @@
 name: Spellcheck
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "**.md"
-      - ".spellcheck.yml"
-      - ".wordlist.txt"
   pull_request:
     branches: [main]
     paths:
