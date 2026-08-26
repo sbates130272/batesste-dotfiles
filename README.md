@@ -1,6 +1,7 @@
 # batesste-dotfiles
 
 [![Validate](https://github.com/sbates130272/batesste-dotfiles/actions/workflows/validate.yml/badge.svg)](https://github.com/sbates130272/batesste-dotfiles/actions/workflows/validate.yml)
+[![Integration](https://github.com/sbates130272/batesste-dotfiles/actions/workflows/integration.yml/badge.svg)](https://github.com/sbates130272/batesste-dotfiles/actions/workflows/integration.yml)
 [![Install Check](https://github.com/sbates130272/batesste-dotfiles/actions/workflows/install-check.yml/badge.svg)](https://github.com/sbates130272/batesste-dotfiles/actions/workflows/install-check.yml)
 [![Secret Scan](https://github.com/sbates130272/batesste-dotfiles/actions/workflows/secret-scan.yml/badge.svg)](https://github.com/sbates130272/batesste-dotfiles/actions/workflows/secret-scan.yml)
 [![Shell Check](https://github.com/sbates130272/batesste-dotfiles/actions/workflows/shellcheck.yml/badge.svg)](https://github.com/sbates130272/batesste-dotfiles/actions/workflows/shellcheck.yml)
