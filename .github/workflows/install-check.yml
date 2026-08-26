@@ -1,0 +1,72 @@
+name: Install check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: install-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check-secrets-unlocked:
+    name: check_secrets_unlocked() behaviour
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      # Each step sources install.sh with `main` stubbed out so only function
+      # definitions are loaded, then calls check_secrets_unlocked directly.
+      - name: Exits 0 when secrets dir is absent
+        run: |
+          bash <<'EOF'
+          main() { :; }
+          DOTFILES_DIR="$(mktemp -d)"
+          source install.sh
+          check_secrets_unlocked && echo "OK: exited 0 as expected"
+          EOF
+
+      - name: Exits 1 when secrets file is encrypted (binary)
+        run: |
+          bash <<'EOF'
+          main() { :; }
+          DOTFILES_DIR="$(mktemp -d)"
+          mkdir -p "$DOTFILES_DIR/secrets"
+          # Write a binary blob that mimics a git-crypt-locked file.
+          printf '\x00\x01\x02GITCRYPT\x00' > "$DOTFILES_DIR/secrets/.secrets.env"
+          source install.sh
+          # check_secrets_unlocked calls exit, so run in a subshell; disable
+          # set -e around the capture so the non-zero rc is catchable.
+          { ( check_secrets_unlocked ); rc=$?; } || true
+          [ "$rc" -ne 0 ] && echo "OK: exited non-zero as expected" || { echo "ERROR: should have exited 1"; exit 1; }
+          EOF
+
+      - name: Exits 1 when secrets file is missing entirely
+        run: |
+          bash <<'EOF'
+          main() { :; }
+          DOTFILES_DIR="$(mktemp -d)"
+          mkdir -p "$DOTFILES_DIR/secrets"
+          # Directory present but file absent — simulates a partial clone.
+          source install.sh
+          # check_secrets_unlocked calls exit, so run in a subshell; disable
+          # set -e around the capture so the non-zero rc is catchable.
+          { ( check_secrets_unlocked ); rc=$?; } || true
+          [ "$rc" -ne 0 ] && echo "OK: exited non-zero as expected" || { echo "ERROR: should have exited 1"; exit 1; }
+          EOF
+
+      - name: Exits 0 when secrets file is plaintext (unlocked)
+        run: |
+          bash <<'EOF'
+          main() { :; }
+          DOTFILES_DIR="$(mktemp -d)"
+          mkdir -p "$DOTFILES_DIR/secrets"
+          printf 'MY_VAR=hello\n' > "$DOTFILES_DIR/secrets/.secrets.env"
+          source install.sh
+          check_secrets_unlocked && echo "OK: exited 0 as expected"
+          EOF
