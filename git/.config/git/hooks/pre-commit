@@ -60,6 +60,13 @@ for file in "${staged[@]}"; do
         matches="$(printf '%s\n' "$matches" | grep -vP '^(.)\1*$' || true)"
         [[ -z "$matches" ]] && continue
 
+        # Discard matches that appear inside a URL on the same line. Secrets
+        # are values, not URL path components — badge/shield URLs in Markdown
+        # are the canonical false-positive source for the high-entropy pattern.
+        url_lines="$(git diff --cached -- "$file" | grep -P '^\+[^+]' | grep -oP 'https?://\S+' | grep -oP "$regex" || true)"
+        matches="$(comm -23 <(printf '%s\n' "$matches" | sort) <(printf '%s\n' "$url_lines" | sort) || true)"
+        [[ -z "$matches" ]] && continue
+
         echo -e "${RED}[pre-commit] Possible secret detected in $file${NC}"
         echo -e "  ${YELLOW}Pattern: $label${NC}"
         found=1
