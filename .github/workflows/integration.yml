@@ -81,7 +81,7 @@ jobs:
           check_link "$HOME/.profile"             "$REPO"
           check_link "$HOME/.gitconfig"           "$REPO"
           check_link "$HOME/.config/git/hooks/pre-commit" "$REPO"
-          check_link "$HOME/.claude/settings.json" "$REPO"
+          check_link "$HOME/.claude/hooks"         "$REPO"
           check_link "$HOME/.config/gh/config.yml" "$REPO"
           check_link "$HOME/.aws/config"          "$REPO"
           check_link "$HOME/.ssh/config"          "$REPO"

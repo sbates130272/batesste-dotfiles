@@ -25,6 +25,24 @@ is_package() {
     return 0
 }
 
+check_secrets_unlocked() {
+    local secrets_src="$DOTFILES_DIR/secrets/.secrets.env"
+
+    # If secrets/ is not in the repo at all, nothing to check.
+    [[ -d "$DOTFILES_DIR/secrets" ]] || return 0
+
+    # git-crypt leaves encrypted files as binary blobs. grep -qI tests whether
+    # the file contains only printable text; failure means it is still locked.
+    if [[ ! -f "$secrets_src" ]] || ! grep -qI '' "$secrets_src" 2>/dev/null; then
+        echo ""
+        echo "[dotfiles] ERROR: secrets/.secrets.env is still encrypted (git-crypt is locked)."
+        echo "           Run:   git-crypt unlock"
+        echo "           Then re-run: ./install.sh"
+        echo ""
+        exit 1
+    fi
+}
+
 check_deps() {
     local missing=()
     for dep in stow git git-crypt envsubst; do
@@ -297,6 +315,7 @@ usage() {
 
 main() {
     check_deps
+    check_secrets_unlocked
 
     if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
         usage
@@ -480,4 +499,4 @@ post_install_reminders() {
     if [[ "$warned" -eq 1 ]]; then echo ""; fi
 }
 
-main "$@"
+[[ "${BASH_SOURCE[0]}" == "${0}" ]] && main "$@"
