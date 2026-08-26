@@ -14,38 +14,59 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  install-smoke:
-    name: install and smoke-test on Ubuntu 24.04
-    runs-on: ubuntu-24.04
+  full-install:
+    name: install and test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-26.04]
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install dependencies
-        run: sudo apt-get update -q && sudo apt-get install -y -q stow git git-crypt gettext-base
-
-      - name: Stub secrets for CI
+      # ── Dependencies ────────────────────────────────────────────────────────
+      - name: Install apt dependencies
         run: |
-          # The repo's secrets/.secrets.env is a git-crypt binary blob in CI.
-          # Replace it with a plaintext stub so check_secrets_unlocked() passes
-          # and expand_templates() can run. Values are fake — just non-empty so
-          # the required-variable check passes. AWS_BATESSTE_PMEM_KEY_B64 must
-          # be valid base64 because install.sh pipes it through base64 -d.
-          # Values are structurally valid but use prefixes that no real token
-          # issuer uses, so gitleaks and the pre-commit hook stay quiet.
-          {
-            echo 'AWS_ACCESS_KEY_ID=CI_FAKE_ACCESS_KEY_ID'
-            echo 'AWS_SECRET_ACCESS_KEY=CI_FAKE_SECRET_ACCESS_KEY'
-            echo 'AWS_BATESSTE_PMEM_KEY_B64=dGVzdC1wbWVtLWtleQ=='
-            echo 'DOCKER_AUTH=dXNlcjpwYXNz'
-            echo 'GH_TOKEN_STEBATES_AMDENG=ci_fake_github_token_amdeng'
-            echo 'GH_TOKEN_SBATES130272=ci_fake_github_token_sbates'
-            echo 'HF_TOKEN=ci_fake_huggingface_token'
-            echo 'OPENROUTER_API_KEY=ci_fake_openrouter_key'
-          } > secrets/.secrets.env
+          sudo apt-get update -q
+          sudo apt-get install -y -q \
+            stow git git-crypt gettext-base \
+            emacs-nox \
+            ansible \
+            awscli
 
+      - name: Install gh CLI
+        run: |
+          # gh is not always in the default Ubuntu repos. Use GitHub's official
+          # apt source so we get a consistent version across matrix runners.
+          type -p gh &>/dev/null && { echo "gh already installed: $(gh --version | head -1)"; exit 0; }
+          sudo mkdir -p -m 755 /etc/apt/keyrings
+          wget -qO- https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+            | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null
+          sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+            | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+          sudo apt-get update -q
+          sudo apt-get install -y -q gh
+
+      # ── git-crypt unlock ────────────────────────────────────────────────────
+      # GIT_CRYPT_KEY_BASE64 is the symmetric git-crypt key, base64-encoded.
+      # Generate it from your local checkout with:
+      #   git-crypt export-key /tmp/dotfiles.key && base64 -w0 /tmp/dotfiles.key
+      # Then add the output as the GIT_CRYPT_KEY_BASE64 repo secret.
+      - name: Unlock git-crypt
+        env:
+          GIT_CRYPT_KEY_BASE64: ${{ secrets.GIT_CRYPT_KEY_BASE64 }}
+        run: |
+          echo "$GIT_CRYPT_KEY_BASE64" | base64 -d > /tmp/git-crypt.key
+          git-crypt unlock /tmp/git-crypt.key
+          rm -f /tmp/git-crypt.key
+
+      # ── Run install ─────────────────────────────────────────────────────────
       - name: Run install
         run: ./install.sh --force
 
+      # ── Stow symlink verification ───────────────────────────────────────────
       - name: Verify stow symlinks
         run: |
           failed=0
@@ -77,17 +98,20 @@ jobs:
             echo "OK: $link -> $resolved"
           }
           REPO="$PWD"
-          check_link "$HOME/.bashrc"              "$REPO"
-          check_link "$HOME/.profile"             "$REPO"
-          check_link "$HOME/.gitconfig"           "$REPO"
-          check_link "$HOME/.config/git/hooks/pre-commit" "$REPO"
-          check_link "$HOME/.claude/hooks"         "$REPO"
-          check_link "$HOME/.config/gh/config.yml" "$REPO"
-          check_link "$HOME/.aws/config"          "$REPO"
-          check_link "$HOME/.ssh/config"          "$REPO"
-          check_link "$HOME/.emacs"               "$REPO"
+          check_link "$HOME/.bashrc"                         "$REPO"
+          check_link "$HOME/.profile"                        "$REPO"
+          check_link "$HOME/.gitconfig"                      "$REPO"
+          check_link "$HOME/.config/git/hooks/pre-commit"   "$REPO"
+          check_link "$HOME/.claude/hooks"                   "$REPO"
+          check_link "$HOME/.config/gh/config.yml"          "$REPO"
+          check_link "$HOME/.aws/config"                     "$REPO"
+          check_link "$HOME/.ssh/config"                     "$REPO"
+          check_link "$HOME/.emacs"                          "$REPO"
+          check_link "$HOME/.emacs.d/init.el"               "$REPO"
+          check_link "$HOME/.ansible.cfg"                    "$REPO"
           exit $failed
 
+      # ── Template expansion ──────────────────────────────────────────────────
       - name: Verify template expansions
         run: |
           failed=0
@@ -114,6 +138,7 @@ jobs:
           done
           exit $failed
 
+      # ── File permissions ────────────────────────────────────────────────────
       - name: Verify file permissions on secrets
         run: |
           failed=0
@@ -134,6 +159,7 @@ jobs:
           check_mode "$HOME/.config/openrouter-env.sh"  600
           exit $failed
 
+      # ── Shell syntax ────────────────────────────────────────────────────────
       - name: Shell files parse cleanly
         run: |
           failed=0
@@ -161,3 +187,108 @@ jobs:
             echo "ERROR: $f is not executable"
             exit 1
           fi
+
+      # ── GitHub CLI ──────────────────────────────────────────────────────────
+      # Tests that the expanded hosts.yml is valid and the real token works.
+      # GH_TOKEN_STEBATES_AMDENG must be a current fine-grained PAT stored as a
+      # repo secret.  gh reads ~/.config/gh/hosts.yml for the oauth_token, so
+      # we just need GH_CONFIG_DIR to point at the right place.
+      - name: gh auth status (stebates_amdeng)
+        run: |
+          # gh defaults to ~/.config/gh which install put hosts.yml into
+          gh auth status --hostname github.com
+          echo "OK: gh auth status passed"
+
+      - name: gh API smoke test
+        run: |
+          login="$(gh api user --jq .login)"
+          echo "Authenticated as: $login"
+          if [ -z "$login" ]; then
+            echo "ERROR: gh api user returned empty login"
+            exit 1
+          fi
+          echo "OK: gh api user -> $login"
+
+      # ── AWS ─────────────────────────────────────────────────────────────────
+      # Tests that ~/.aws/credentials is valid and the access key is active.
+      # AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY are stored as repo secrets
+      # and must match the values baked into the expanded credentials file.
+      - name: aws sts get-caller-identity
+        env:
+          AWS_PROFILE: batesste
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          identity="$(aws sts get-caller-identity --output json)"
+          echo "$identity"
+          account="$(echo "$identity" | python3 -c 'import sys,json; print(json.load(sys.stdin)["Account"])')"
+          if [ -z "$account" ]; then
+            echo "ERROR: could not parse Account from sts response"
+            exit 1
+          fi
+          echo "OK: AWS account $account"
+
+      - name: aws config profile is stowed
+        run: |
+          f="$HOME/.aws/config"
+          if [ ! -e "$f" ]; then
+            echo "ERROR: $HOME/.aws/config does not exist"
+            exit 1
+          fi
+          echo "OK: $f"
+          cat "$f"
+
+      # ── Emacs ───────────────────────────────────────────────────────────────
+      # .emacs requires rust-mode which is not installed by default. We verify
+      # that emacs starts and that init.el loads without crashing (it only
+      # configures package archives). The .emacs file itself is loaded in a
+      # separate pass with rust-mode stubbed out so we catch parse errors there
+      # too, without requiring ELPA package installation in CI.
+      - name: emacs --version
+        run: emacs --version
+
+      - name: emacs init.el loads in batch mode
+        run: |
+          # init.el calls package-refresh-contents which hits the network.
+          # Stub it out so the test is hermetic, then load init.el directly.
+          emacs --batch --eval "
+            (fset 'package-refresh-contents (lambda (&rest _) nil))
+            (fset 'package-initialize (lambda (&rest _) nil))
+            (load \"$HOME/.emacs.d/init.el\")
+            (message \"init.el OK\")"
+
+      - name: .emacs loads in batch mode (rust-mode stubbed)
+        run: |
+          # Stub require so rust-mode (not installed) does not abort the load.
+          emacs --batch --eval "
+            (fset 'original-require (symbol-function 'require))
+            (fset 'require (lambda (feature &rest args)
+              (unless (eq feature 'rust-mode)
+                (apply 'original-require feature args))))
+            (load \"$HOME/.emacs\")
+            (message \".emacs OK\")"
+
+      # ── Ansible ─────────────────────────────────────────────────────────────
+      - name: ansible version
+        run: |
+          ansible --version
+          echo "OK: ansible is available"
+
+      - name: ansible.cfg is stowed
+        run: |
+          f="$HOME/.ansible.cfg"
+          if [ ! -e "$f" ]; then
+            echo "ERROR: $HOME/.ansible.cfg does not exist"
+            exit 1
+          fi
+          echo "OK: $f"
+          cat "$f"
+
+      - name: ansible localhost ping
+        run: |
+          ansible localhost -m ping -i 'localhost,' -c local
+          echo "OK: ansible localhost ping passed"
+
+      - name: ansible-playbook --version
+        run: |
+          ansible-playbook --version
+          echo "OK: ansible-playbook is available"
