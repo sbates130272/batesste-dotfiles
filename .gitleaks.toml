@@ -1,0 +1,15 @@
+[allowlist]
+  description = "known false positives"
+
+  [[allowlist.findings]]
+    # GPG key fingerprints are 40 hex chars — not secrets.
+    id = "gpg-signing-key-fingerprint"
+    path = "git/.gitconfig"
+    regex = "signingkey\\s*=\\s*[0-9A-F]{40}"
+
+  [[allowlist.findings]]
+    # CI stub: a plaintext base64 value used only in the integration smoke
+    # test to satisfy install.sh's required-variable check. Not a real key.
+    id = "ci-stub-pmem-key"
+    path = ".github/workflows/integration.yml"
+    regex = "AWS_BATESSTE_PMEM_KEY_B64=dGVzdC1wbWVtLWtleQ=="

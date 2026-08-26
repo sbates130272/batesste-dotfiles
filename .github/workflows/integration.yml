@@ -56,12 +56,19 @@ jobs:
               failed=1
               return
             fi
-            if [ ! -L "$link" ]; then
-              echo "ERROR: $link is not a symlink"
+            # stow folds a package subdir into a single symlink when nothing
+            # else lives there, so the symlink may be on a parent directory
+            # rather than the file itself. Walk up until we find the symlink.
+            local check="$link"
+            while [ "$check" != "/" ] && [ ! -L "$check" ]; do
+              check="$(dirname "$check")"
+            done
+            if [ ! -L "$check" ]; then
+              echo "ERROR: $link — no symlink found in path (stow did not link it)"
               failed=1
               return
             fi
-            resolved="$(readlink -f "$link")"
+            resolved="$(readlink -f "$check")"
             if [ "${resolved#"$target_prefix"}" = "$resolved" ]; then
               echo "ERROR: $link -> $resolved (does not point into $target_prefix)"
               failed=1
