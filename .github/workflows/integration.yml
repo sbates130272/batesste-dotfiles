@@ -35,13 +35,16 @@ jobs:
 
       - name: Install AWS CLI v2
         run: |
-          # awscli apt package was dropped from Ubuntu 24.04+; use the official
-          # installer which works consistently across all matrix runners.
-          curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
-          unzip -q /tmp/awscliv2.zip -d /tmp
-          sudo /tmp/aws/install
-          rm -rf /tmp/awscliv2.zip /tmp/aws
-          aws --version
+          # AWS CLI v2 is pre-installed on GitHub Actions runners; skip if present.
+          if command -v aws &>/dev/null; then
+            echo "aws already installed: $(aws --version)"
+          else
+            curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+            unzip -q /tmp/awscliv2.zip -d /tmp
+            sudo /tmp/aws/install
+            rm -rf /tmp/awscliv2.zip /tmp/aws
+            aws --version
+          fi
 
       - name: Install gh CLI
         run: |
