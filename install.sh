@@ -499,4 +499,4 @@ post_install_reminders() {
     if [[ "$warned" -eq 1 ]]; then echo ""; fi
 }
 
-[[ "${BASH_SOURCE[0]}" == "${0}" ]] && main "$@"
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then main "$@"; fi
