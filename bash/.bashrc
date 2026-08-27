@@ -131,7 +131,7 @@ export EDITOR=emacs
 export HF_HOME="$HOME/.cache/huggingface"
 
 # PATH additions (deduplicated)
-export PATH="/home/stebates/.local/bin:$PATH"
+export PATH="$HOME/.local/bin:$PATH"
 export PATH="/usr/lib/ccache:$PATH"
 
 # CA bundle for Claude CLI (WSL + AMD ZScaler)
