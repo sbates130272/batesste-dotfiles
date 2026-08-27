@@ -22,3 +22,9 @@
 - Prefer new commits over amending published commits
 - Confirm before: git push, force operations, branch deletion
 - When asked for a "commit message" or to "commit": write the message to /tmp/<repo-name>-commit-msg.txt and show the git command to use it. Never commit directly.
+
+## GitHub
+- Use `gh` (GitHub CLI) for all GitHub operations: PR status, issue tracking, checks, reviews, release info
+- Default account is `sbates130272` — verify with `gh auth status` if switching accounts; never assume another account is active
+- Always act as `sbates130272` (e.g. opening issues, commenting, creating PRs) unless the user explicitly directs otherwise
+- Prefer `gh` over direct API calls or web URLs for any GitHub state queries
