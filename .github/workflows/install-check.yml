@@ -62,3 +62,35 @@ jobs:
           source install.sh
           check_secrets_unlocked && echo "OK: exited 0 as expected"
           EOF
+
+  bootstrap-dispatch:
+    name: bootstrap dispatch logic
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Both bootstrap scripts are executable
+        run: |
+          for variant in proxy noproxy; do
+            f="scripts/bootstrap-${variant}.sh"
+            [ -x "$f" ] || { echo "ERROR: $f is not executable"; exit 1; }
+            echo "OK: $f is executable"
+          done
+
+      - name: run_host_bootstrap() rejects unknown variants
+        run: |
+          bash <<'EOF'
+          DOTFILES_DIR="$PWD"
+          source install.sh
+          { ( run_host_bootstrap "badvariant" ); rc=$?; } || true
+          [ "$rc" -ne 0 ] && echo "OK: exited non-zero as expected" || { echo "ERROR: should have exited non-zero"; exit 1; }
+          EOF
+
+      - name: --bootstrap flag rejects unknown values
+        run: |
+          bash <<'EOF'
+          DOTFILES_DIR="$PWD"
+          source install.sh
+          { ( main --bootstrap badvariant ); rc=$?; } || true
+          [ "$rc" -ne 0 ] && echo "OK: exited non-zero as expected" || { echo "ERROR: should have exited non-zero"; exit 1; }
+          EOF
