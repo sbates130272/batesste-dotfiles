@@ -296,7 +296,10 @@ usage() {
     echo "Usage: $0 [--bootstrap] [--force] [packages...]"
     echo ""
     echo "Options:"
-    echo "  --bootstrap   Run the host bootstrap script after stowing (scripts/bootstrap-<hostname>.sh)"
+    echo "  --bootstrap proxy|noproxy"
+    echo "                Run a bootstrap script after stowing. Use 'proxy' for machines that"
+    echo "                reach llm-api.amd.com via a local tunnel (localhost:8888), or 'noproxy'"
+    echo "                for machines with direct AMD network access."
     echo "  --force       Back up conflicting files before stowing (backup extension: .YYYYMMDD_HHMMSS),"
     echo "                and take over symlinks left behind by another checkout of this repo."
     echo ""
@@ -322,18 +325,27 @@ main() {
         exit 0
     fi
 
-    local do_bootstrap=0
+    local do_bootstrap=""
     local args=()
     local pkg_name
-    for arg in "$@"; do
+    local argv=("$@")
+    local i=0
+    while [[ $i -lt ${#argv[@]} ]]; do
+        local arg="${argv[$i]}"
         if [[ "$arg" == "--bootstrap" ]]; then
-            do_bootstrap=1
+            i=$((i+1))
+            do_bootstrap="${argv[$i]:-}"
+            if [[ "$do_bootstrap" != "proxy" && "$do_bootstrap" != "noproxy" ]]; then
+                echo "ERROR: --bootstrap requires 'proxy' or 'noproxy'" >&2
+                exit 1
+            fi
         elif [[ "$arg" == "--force" ]]; then
             _DO_FORCE=1
             _DATESTAMP="$(date +%Y%m%d_%H%M%S)"
         else
             args+=("$arg")
         fi
+        i=$((i+1))
     done
 
     local packages=("${args[@]+"${args[@]}"}")
@@ -359,8 +371,8 @@ main() {
 
     heal_claude_settings
     expand_templates
-    if [[ "$do_bootstrap" -eq 1 ]]; then
-        run_host_bootstrap
+    if [[ -n "$do_bootstrap" ]]; then
+        run_host_bootstrap "$do_bootstrap"
     fi
     record_install
     post_install_reminders
@@ -454,13 +466,14 @@ expand_templates() {
 }
 
 run_host_bootstrap() {
-    local host
-    host="$(hostname -s)"
-    local script="$DOTFILES_DIR/scripts/bootstrap-${host}.sh"
-    if [[ -x "$script" ]]; then
-        log "Running host bootstrap: $script"
-        "$script"
+    local type="$1"
+    local script="$DOTFILES_DIR/scripts/bootstrap-${type}.sh"
+    if [[ ! -x "$script" ]]; then
+        echo "ERROR: bootstrap script not found or not executable: $script" >&2
+        exit 1
     fi
+    log "Running bootstrap: $script"
+    "$script"
 }
 
 check_gpg_key() {
