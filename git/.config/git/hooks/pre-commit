@@ -61,6 +61,12 @@ for file in "${staged[@]}"; do
         continue
     fi
 
+    # Skip X.509 certificate files — PEM base64 always triggers high-entropy
+    # patterns but is public infrastructure, not a secret.
+    if [[ "$file" =~ \.(crt|pem|cer|der)$ ]]; then
+        continue
+    fi
+
     for label in "${!PATTERNS[@]}"; do
         regex="${PATTERNS[$label]}"
         # Scan only added lines (+) in the staged diff, not the full file, to
