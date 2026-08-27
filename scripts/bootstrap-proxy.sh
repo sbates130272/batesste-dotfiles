@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Run on snoc-think to write machine-local Claude settings.
-# Requires the SSH reverse tunnel (localhost:8888) to be active so
-# Claude Code can reach the AMD API gateway via this WSL2 node.
+# Bootstrap for machines that reach llm-api.amd.com via a local proxy tunnel.
+# Run via: ./install.sh --bootstrap proxy
+# Requires the SSH reverse tunnel (localhost:8888) to be active.
 # Requires git-crypt to be unlocked so ~/.secrets.env is readable.
 set -euo pipefail
 
@@ -24,31 +24,36 @@ if [[ -z "$ANTHROPIC_API_KEY" ]]; then
 fi
 
 SETTINGS="$HOME/.claude/settings.local.json"
-TEMPLATE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/templates/claude-settings-local.json"
 install -d "$HOME/.claude"
 
-# Older checkouts stowed settings.local.json into the repo. Writing through
-# that symlink would put the subscription key in the working tree, so drop it.
 [[ -L "$SETTINGS" ]] && rm "$SETTINGS"
 
-# This host reaches the AMD gateway through the reverse tunnel on the WSL2 node.
-export CLAUDE_PROXY_URL="http://localhost:8888"
-export ANTHROPIC_CUSTOM_HEADERS ANTHROPIC_API_KEY
-
-( umask 077; envsubst < "$TEMPLATE" > "$SETTINGS" )
+( umask 077; cat > "$SETTINGS" << EOF
+{
+  "env": {
+    "HTTP_PROXY": "http://localhost:8888",
+    "HTTPS_PROXY": "http://localhost:8888",
+    "NO_PROXY": "localhost,127.0.0.1",
+    "NODE_EXTRA_CA_CERTS": "/etc/ssl/certs/ca-certificates.crt",
+    "ANTHROPIC_CUSTOM_HEADERS": "${ANTHROPIC_CUSTOM_HEADERS}",
+    "ANTHROPIC_API_KEY": "${ANTHROPIC_API_KEY}"
+  }
+}
+EOF
+)
 chmod 600 "$SETTINGS"
-echo "Wrote $SETTINGS"
+echo "[dotfiles] Wrote $SETTINGS"
 
 # VS Code extension reads claudeCode.environmentVariables, not settings.local.json.
 VSCODE_SETTINGS="$HOME/.vscode-server/data/Machine/settings.json"
-if [[ -f "$VSCODE_SETTINGS" ]]; then
-    python3 - "$VSCODE_SETTINGS" "$ANTHROPIC_CUSTOM_HEADERS" "$ANTHROPIC_API_KEY" <<'PYEOF'
+install -d "$(dirname "$VSCODE_SETTINGS")"
+[[ -f "$VSCODE_SETTINGS" ]] || echo '{}' > "$VSCODE_SETTINGS"
+
+python3 - "$VSCODE_SETTINGS" "$ANTHROPIC_CUSTOM_HEADERS" "$ANTHROPIC_API_KEY" <<'PYEOF'
 import sys, json
 path, custom_headers, api_key = sys.argv[1], sys.argv[2], sys.argv[3]
 with open(path) as f:
     s = json.load(f)
-# The gateway/model vars come from ~/.config/claude/env.sh for shell-launched
-# Claude, but the extension does not go through a login shell, so repeat them.
 s["claudeCode.environmentVariables"] = [
     {"name": "ANTHROPIC_CUSTOM_HEADERS",       "value": custom_headers},
     {"name": "ANTHROPIC_API_KEY",              "value": api_key},
@@ -66,5 +71,4 @@ with open(path, "w") as f:
     json.dump(s, f, indent=4)
     f.write("\n")
 PYEOF
-    echo "Updated $VSCODE_SETTINGS"
-fi
+echo "[dotfiles] Updated $VSCODE_SETTINGS"
