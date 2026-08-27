@@ -1,0 +1,79 @@
+name: README Structure
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: readme-structure-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check-structure:
+    name: README structure matches stow packages
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check README lists every stow package
+        run: |
+          # Non-package directories (must match install.sh _NON_PACKAGES, plus .github)
+          NON_PACKAGES="templates scripts .github"
+
+          # Collect actual stow packages from the repo root
+          actual=()
+          for dir in */; do
+            pkg="${dir%/}"
+            skip=0
+            for np in $NON_PACKAGES; do
+              [ "$pkg" = "$np" ] && skip=1 && break
+            done
+            [ "$skip" -eq 1 ] && continue
+            actual+=("$pkg")
+          done
+
+          # Extract package names from the Structure code block in README.md.
+          # The block starts with ```text and ends with the next ```.
+          # Each package line looks like: "pkgname/   # comment"
+          readme_packages=()
+          in_block=0
+          while IFS= read -r line; do
+            if [ "$in_block" -eq 0 ]; then
+              echo "$line" | grep -q '^\`\`\`text' && in_block=1
+              continue
+            fi
+            echo "$line" | grep -q '^\`\`\`' && break
+            pkg="$(echo "$line" | grep -oE '^[a-z_-]+/')"
+            [ -n "$pkg" ] && readme_packages+=("${pkg%/}")
+          done < README.md
+
+          failed=0
+
+          for pkg in "${actual[@]}"; do
+            found=0
+            for r in "${readme_packages[@]}"; do
+              [ "$pkg" = "$r" ] && found=1 && break
+            done
+            if [ "$found" -eq 0 ]; then
+              echo "ERROR: stow package '$pkg' is missing from the README Structure section."
+              failed=1
+            else
+              echo "OK: $pkg"
+            fi
+          done
+
+          for r in "${readme_packages[@]}"; do
+            found=0
+            for pkg in "${actual[@]}"; do
+              [ "$r" = "$pkg" ] && found=1 && break
+            done
+            if [ "$found" -eq 0 ]; then
+              echo "ERROR: README lists '$r' but no such directory exists in the repo."
+              failed=1
+            fi
+          done
+
+          exit $failed
