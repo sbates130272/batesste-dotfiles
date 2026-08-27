@@ -40,12 +40,13 @@ jobs:
           # Each package line looks like: "pkgname/   # comment"
           readme_packages=()
           in_block=0
+          FENCE='```'
           while IFS= read -r line; do
             if [ "$in_block" -eq 0 ]; then
-              echo "$line" | grep -q '^\`\`\`text' && in_block=1
+              [ "$line" = "${FENCE}text" ] && in_block=1
               continue
             fi
-            echo "$line" | grep -q '^\`\`\`' && break
+            [ "$line" = "${FENCE}" ] && break
             pkg="$(echo "$line" | grep -oE '^[a-z_-]+/')"
             [ -n "$pkg" ] && readme_packages+=("${pkg%/}")
           done < README.md
