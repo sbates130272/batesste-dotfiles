@@ -29,9 +29,24 @@ declare -A git_crypt_set
 for f in "${git_crypt_files[@]}"; do git_crypt_set["$f"]=1; done
 
 found=0
+# Paths that are known-safe and should not be scanned for secrets.
+# Patch files (.patch, .diff) in a patches/ directory intentionally contain
+# git SHAs (40-char hex) and long file paths that trigger high-entropy patterns.
+# These are structural metadata, not credentials.
+declare -a SECRET_SCAN_ALLOWLIST=(
+    "patches/"
+)
+
 for file in "${staged[@]}"; do
     # Skip if file is not in the working tree (e.g. deleted)
     [[ -f "$file" ]] || continue
+
+    # Skip explicitly allowed paths (patch files with git SHAs, long kernel paths)
+    _skip=0
+    for _allowed in "${SECRET_SCAN_ALLOWLIST[@]}"; do
+        [[ "$file" == "${_allowed}"* ]] && _skip=1 && break
+    done
+    [[ "$_skip" -eq 1 ]] && continue
 
     # Skip files managed by git-crypt (encrypted at rest, safe regardless of lock state)
     [[ -n "${git_crypt_set[$file]:-}" ]] && continue
@@ -65,6 +80,20 @@ for file in "${staged[@]}"; do
         # are the canonical false-positive source for the high-entropy pattern.
         url_lines="$(git diff --cached -- "$file" | grep -P '^\+[^+]' | grep -oP 'https?://\S+' | grep -oP "$regex" || true)"
         matches="$(comm -23 <(printf '%s\n' "$matches" | sort) <(printf '%s\n' "$url_lines" | sort) || true)"
+        [[ -z "$matches" ]] && continue
+
+        # Discard matches that are git commit SHAs used as version pins.
+        # Covers: COMMIT=/COMMIT = (shell/Python), _commit: (YAML key),
+        # git checkout, git rev-parse, and similar structural patterns.
+        sha_lines="$(git diff --cached -- "$file" | grep -P '^\+[^+]' | grep -P '(COMMIT[[:space:]]*[=:]|_commit[[:space:]]*:|git checkout|git rev-parse|_SHA[[:space:]]*[=:]|_HASH[[:space:]]*[=:])' | grep -oP "$regex" || true)"
+        matches="$(comm -23 <(printf '%s\n' "$matches" | sort) <(printf '%s\n' "$sha_lines" | sort) || true)"
+        [[ -z "$matches" ]] && continue
+
+        # Discard standalone exactly-40-char lowercase hex strings. These are
+        # git SHAs appearing as bare YAML block-scalar values with no key
+        # context on the same line.
+        sha_bare="$(printf '%s\n' "$matches" | grep -P '^[0-9a-f]{40}$' || true)"
+        matches="$(comm -23 <(printf '%s\n' "$matches" | sort) <(printf '%s\n' "$sha_bare" | sort) || true)"
         [[ -z "$matches" ]] && continue
 
         echo -e "${RED}[pre-commit] Possible secret detected in $file${NC}"
