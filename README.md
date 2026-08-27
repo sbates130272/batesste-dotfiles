@@ -4,6 +4,7 @@
 [![Integration](https://github.com/sbates130272/batesste-dotfiles/actions/workflows/integration.yml/badge.svg)](https://github.com/sbates130272/batesste-dotfiles/actions/workflows/integration.yml)
 [![Install Check](https://github.com/sbates130272/batesste-dotfiles/actions/workflows/install-check.yml/badge.svg)](https://github.com/sbates130272/batesste-dotfiles/actions/workflows/install-check.yml)
 [![Secret Scan](https://github.com/sbates130272/batesste-dotfiles/actions/workflows/secret-scan.yml/badge.svg)](https://github.com/sbates130272/batesste-dotfiles/actions/workflows/secret-scan.yml)
+[![README Structure](https://github.com/sbates130272/batesste-dotfiles/actions/workflows/readme-structure.yml/badge.svg)](https://github.com/sbates130272/batesste-dotfiles/actions/workflows/readme-structure.yml)
 [![Shell Check](https://github.com/sbates130272/batesste-dotfiles/actions/workflows/shellcheck.yml/badge.svg)](https://github.com/sbates130272/batesste-dotfiles/actions/workflows/shellcheck.yml)
 [![Spellcheck](https://github.com/sbates130272/batesste-dotfiles/actions/workflows/spellcheck.yml/badge.svg)](https://github.com/sbates130272/batesste-dotfiles/actions/workflows/spellcheck.yml)
 [![Release](https://github.com/sbates130272/batesste-dotfiles/actions/workflows/release.yml/badge.svg)](https://github.com/sbates130272/batesste-dotfiles/actions/workflows/release.yml)
@@ -17,6 +18,7 @@ Personal dotfiles for Stephen Bates, managed with [GNU Stow](https://www.gnu.org
 Each top-level directory is a **stow package** — its contents mirror `$HOME`. For example:
 
 ```text
+ansible/       # ~/.ansible.cfg
 aws/           # ~/.aws/config (non-secret region/output settings)
 bash/          # ~/.bashrc, ~/.profile
 claude/        # ~/.claude/settings.json and hooks
@@ -25,10 +27,12 @@ gh/            # ~/.config/gh/config.yml (non-secret gh settings)
 git/           # ~/.gitconfig, ~/.config/git/hooks/pre-commit
 secrets/       # ~/.secrets.env (git-crypt encrypted)
 ssh/           # ~/.ssh/config
-templates/     # envsubst templates expanded by install.sh (not stowed)
 ```
 
-Running `stow bash` from the repo root creates `~/.bashrc -> ~/Projects/batesste-dotfiles/bash/.bashrc` etc.
+Run `./install.sh` from the repo root to stow all packages. Two directories are **not** stow packages and their contents stay in the repo:
+
+- `templates/` — `envsubst` inputs expanded by `install.sh` into `$HOME` at install time
+- `scripts/` — bootstrap and helper scripts invoked directly from the repo
 
 ## Requirements
 
@@ -43,8 +47,8 @@ Your GPG private key must be available on any new machine (used for both commit 
 ## Install
 
 ```bash
-git clone git@github.com:sbates130272/batesste-dotfiles.git ~/Projects/batesste-dotfiles
-cd ~/Projects/batesste-dotfiles
+git clone git@github.com:sbates130272/batesste-dotfiles.git <install-location>
+cd <install-location>
 git-crypt unlock    # requires your GPG private key
 ./install.sh
 ```
@@ -75,9 +79,9 @@ Secrets are stored encrypted in this repo using [git-crypt](https://github.com/A
 
 | File | Purpose |
 | --- | --- |
-| `secrets/.secrets.env` | All secret values (`HF_TOKEN`, `DOCKER_PAT`, `DOCKER_AUTH`, `ANTHROPIC_API_KEY`, `ANTHROPIC_CUSTOM_HEADERS`, `OTEL_RESOURCE_ATTRIBUTES`, `GH_TOKEN_*`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_BATESSTE_PMEM_KEY_B64`) |
+| `secrets/.secrets.env` | All secret values (API keys, tokens, credentials) |
 
-`install.sh` uses `envsubst` to expand templates in `templates/` into `$HOME` after sourcing the secrets file. The AWS pmem key is stored base64-encoded and decoded by `install.sh` during expansion. `HF_TOKEN` is written directly to `~/.cache/huggingface/token`, which `huggingface_hub` reads natively — no shell env var sourcing required.
+`install.sh` uses `envsubst` to expand templates in `templates/` into `$HOME` after sourcing the secrets file. Some secrets are written directly to well-known locations rather than exported as shell environment variables.
 
 Secrets are encrypted with git-crypt. Import your GPG private key before running `git-crypt unlock`.
 
