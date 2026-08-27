@@ -49,6 +49,13 @@ git-crypt unlock    # requires your GPG private key
 ./install.sh
 ```
 
+On a fresh machine, run bootstrap after stowing to write `~/.claude/settings.local.json` and the VS Code Machine settings. Pass `proxy` for machines that reach the AMD API gateway via an SSH reverse tunnel on `localhost:8888`, or `noproxy` for machines with direct AMD network access:
+
+```bash
+./install.sh --bootstrap proxy     # SSH-tunnel machines
+./install.sh --bootstrap noproxy   # direct AMD network access
+```
+
 Install specific packages only:
 
 ```bash
@@ -76,13 +83,14 @@ Secrets are encrypted with git-crypt. Import your GPG private key before running
 
 ## Machine-local Claude settings
 
-`claude/settings.local.json` is excluded from stow (via `claude/.stow-local-ignore`) so each machine manages it independently. Use the bootstrap script to write the correct `settings.local.json` for a given machine:
+`claude/settings.local.json` is excluded from stow (via `claude/.stow-local-ignore`) so each machine manages it independently. Two bootstrap scripts write the correct `settings.local.json` and the VS Code Machine `settings.json` for a given network topology:
 
-| Machine | Script | Notes |
-| --- | --- | --- |
-| `snoc-think` | `scripts/bootstrap-snoc-think.sh` | Bare Linux; reaches the AMD API gateway via SSH reverse tunnel on `localhost:8888` |
+| Script | When to use |
+| --- | --- |
+| `scripts/bootstrap-proxy.sh` | Machines that reach `llm-api.amd.com` via an SSH reverse tunnel on `localhost:8888` (e.g. bare Linux boxes without ZScaler) |
+| `scripts/bootstrap-noproxy.sh` | Machines with direct AMD network access (e.g. WSL2 behind ZScaler) |
 
-On WSL2 (`apcan-*`), write `~/.claude/settings.local.json` by hand — it only needs local permission overrides and is not secret.
+Invoke via `./install.sh --bootstrap proxy` or `./install.sh --bootstrap noproxy` — see the Install section above.
 
 ## Notes
 
