@@ -73,6 +73,19 @@ Install specific packages only:
 3. Run `./install.sh tmux` to stow it.
 4. Commit and push.
 
+## Adding a Claude slash command
+
+User-level Claude Code slash commands live in `claude/.claude/commands/`. Each
+command is a single `.md` file; the filename (without `.md`) becomes the
+`/command-name` available in any Claude Code session after stowing.
+
+1. Create `claude/.claude/commands/<name>.md`.
+2. Write the prompt body. Use `$ARGUMENTS` anywhere you want text typed after
+   the command name to be substituted.
+3. Run `./install.sh claude` (or `stow claude`) to symlink the new file into
+   `~/.claude/commands/`.
+4. Commit and push.
+
 ## Secrets
 
 Secrets are stored encrypted in this repo using [git-crypt](https://github.com/AGWA/git-crypt). The following files are encrypted at rest and only readable after `git-crypt unlock`:

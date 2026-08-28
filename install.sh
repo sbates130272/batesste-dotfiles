@@ -349,8 +349,10 @@ main() {
     done
 
     local packages=("${args[@]+"${args[@]}"}")
+    local full_install=0
 
     if [[ ${#packages[@]} -eq 0 ]]; then
+        full_install=1
         # Install all packages (skip hidden dirs, non-directories, non-packages)
         while IFS= read -r -d '' dir; do
             pkg_name="$(basename "$dir")"
@@ -369,8 +371,10 @@ main() {
         stow_package "$pkg"
     done
 
-    heal_claude_settings
-    expand_templates
+    if [[ "$full_install" -eq 1 ]]; then
+        heal_claude_settings
+        expand_templates
+    fi
     if [[ -n "$do_bootstrap" ]]; then
         run_host_bootstrap "$do_bootstrap"
     fi
