@@ -419,7 +419,8 @@ expand_templates() {
             AWS_ACCESS_KEY_ID
             AWS_SECRET_ACCESS_KEY
             AWS_BATESSTE_PMEM_KEY_B64
-            DOCKER_AUTH
+            DOCKER_USERNAME
+            DOCKER_PAT
             GH_TOKEN_STEBATES_AMDENG
             GH_TOKEN_SBATES130272
             HF_TOKEN
@@ -441,6 +442,9 @@ expand_templates() {
         envsubst < "$tmpl_dir/gh-hosts.yml" > "$HOME/.config/gh/hosts.yml"
         chmod 600 "$HOME/.config/gh/hosts.yml"
         log "Expanded gh/hosts.yml"
+
+        DOCKER_AUTH=$(printf '%s:%s' "$DOCKER_USERNAME" "$DOCKER_PAT" | base64 -w 0)
+        export DOCKER_AUTH
 
         install -d "$HOME/.docker"
         envsubst < "$tmpl_dir/docker-config.json" > "$HOME/.docker/config.json"
