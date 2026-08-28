@@ -22,6 +22,7 @@ ansible/       # ~/.ansible.cfg
 aws/           # ~/.aws/config (non-secret region/output settings)
 bash/          # ~/.bashrc, ~/.profile
 claude/        # ~/.claude/settings.json and hooks
+docker/        # ~/.docker/daemon.json
 emacs/         # ~/.emacs, ~/.emacs.d/init.el
 gh/            # ~/.config/gh/config.yml (non-secret gh settings)
 git/           # ~/.gitconfig, ~/.config/git/hooks/pre-commit
