@@ -22,6 +22,7 @@
 - Prefer new commits over amending published commits
 - Confirm before: git push, force operations, branch deletion
 - When asked for a "commit message" or to "commit": write the message to /tmp/<repo-name>-commit-msg.txt and show the git command to use it. Never commit directly.
+- Always include `-s` (signoff) in git commit commands.
 
 ## GitHub
 - Use `gh` (GitHub CLI) for all GitHub operations: PR status, issue tracking, checks, reviews, release info
