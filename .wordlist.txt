@@ -1,4 +1,7 @@
 AMD
+amd
+submodules
+vendored
 ROCm
 WSL
 ZScaler
