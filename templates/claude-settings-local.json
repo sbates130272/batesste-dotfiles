@@ -260,5 +260,5 @@
     "Tip: Use /help to see available commands and features"
   ],
   "theme": "auto",
-  "skipDangerousModePermissionPrompt": false
+  "skipDangerousModePermissionPrompt": true
 }
