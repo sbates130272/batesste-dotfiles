@@ -25,20 +25,20 @@ fi
 SETTINGS="$HOME/.claude/settings.local.json"
 install -d "$HOME/.claude"
 
-[[ -L "$SETTINGS" ]] && rm "$SETTINGS"
-
-( umask 077; cat > "$SETTINGS" << EOF
-{
-  "env": {
-    "NODE_EXTRA_CA_CERTS": "/etc/ssl/certs/ca-certificates.crt",
-    "ANTHROPIC_CUSTOM_HEADERS": "${ANTHROPIC_CUSTOM_HEADERS}",
-    "ANTHROPIC_API_KEY": "${ANTHROPIC_API_KEY}"
-  }
-}
-EOF
-)
-chmod 600 "$SETTINGS"
-echo "[dotfiles] Wrote $SETTINGS"
+# Merge env keys into the existing file (which may be a stow symlink).
+# jq writes to a temp file then moves it so the symlink target is updated in-place.
+[[ -f "$SETTINGS" || -L "$SETTINGS" ]] || echo '{}' > "$SETTINGS"
+SETTINGS_TMP="$(dirname "$SETTINGS")/.settings.local.json.tmp"
+( umask 077; jq \
+    --arg ca_certs "/etc/ssl/certs/ca-certificates.crt" \
+    --arg headers  "${ANTHROPIC_CUSTOM_HEADERS}" \
+    --arg api_key  "${ANTHROPIC_API_KEY}" \
+    '.env.NODE_EXTRA_CA_CERTS      = $ca_certs
+   | .env.ANTHROPIC_CUSTOM_HEADERS = $headers
+   | .env.ANTHROPIC_API_KEY        = $api_key' \
+    "$SETTINGS" > "$SETTINGS_TMP" && mv "$SETTINGS_TMP" "$(realpath "$SETTINGS")" )
+chmod 600 "$(realpath "$SETTINGS")"
+echo "[dotfiles] Merged env into $SETTINGS"
 
 # VS Code extension reads claudeCode.environmentVariables, not settings.local.json.
 VSCODE_SETTINGS="$HOME/.vscode-server/data/Machine/settings.json"

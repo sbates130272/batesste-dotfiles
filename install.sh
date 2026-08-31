@@ -268,29 +268,6 @@ stow_package() {
     fi
 }
 
-# Third-party installers (.pixel-agents) rewrite ~/.claude/settings.json from
-# scratch, replacing the stow symlink with a plain file and dropping everything
-# they did not author. Detect that and re-link, keeping a copy of whatever they
-# wrote so its hooks can be merged back by hand.
-heal_claude_settings() {
-    local target="$HOME/.claude/settings.json"
-    local src="$DOTFILES_DIR/claude/.claude/settings.json"
-
-    [[ -f "$src" ]] || return 0
-    [[ -e "$target" || -L "$target" ]] || return 0
-
-    if [[ -L "$target" && "$(readlink -f "$target")" == "$(readlink -f "$src")" ]]; then
-        return 0
-    fi
-
-    local stamp
-    stamp="${_DATESTAMP:-$(date +%Y%m%d_%H%M%S)}"
-    log "WARNING: $target is not the stow symlink — a third-party installer likely replaced it."
-    log "Backing up $target -> ${target}.clobbered.${stamp}"
-    mv "$target" "${target}.clobbered.${stamp}"
-    ln -s "$(realpath --relative-to="$HOME/.claude" "$src")" "$target"
-    log "Re-linked $target"
-}
 
 usage() {
     echo "Usage: $0 [--bootstrap] [--force] [packages...]"
@@ -372,8 +349,10 @@ main() {
     done
 
     if [[ "$full_install" -eq 1 ]]; then
-        heal_claude_settings
         expand_templates
+    fi
+    if [[ "${_DO_FORCE:-0}" -eq 1 || -n "$do_bootstrap" ]]; then
+        install_git_hooks
     fi
     if [[ -n "$do_bootstrap" ]]; then
         run_host_bootstrap "$do_bootstrap"
@@ -471,6 +450,27 @@ expand_templates() {
         chmod 600 "$HOME/.config/openrouter-env.sh"
         log "Expanded openrouter-env.sh"
     )
+}
+
+install_git_hooks() {
+    local hooks_src="$DOTFILES_DIR/scripts/hooks"
+    local hooks_dst="$DOTFILES_DIR/.git/hooks"
+    [[ -d "$hooks_src" ]] || return 0
+    for hook in "$hooks_src"/*; do
+        local name
+        name="$(basename "$hook")"
+        if [[ -e "$hooks_dst/$name" ]]; then
+            if [[ "${_DO_FORCE:-0}" -eq 1 ]]; then
+                log "WARNING: overwriting existing git hook: $name (--force)"
+                cp "$hook" "$hooks_dst/$name"
+                chmod +x "$hooks_dst/$name"
+            fi
+        else
+            cp "$hook" "$hooks_dst/$name"
+            chmod +x "$hooks_dst/$name"
+            log "Installed git hook: $name"
+        fi
+    done
 }
 
 run_host_bootstrap() {
