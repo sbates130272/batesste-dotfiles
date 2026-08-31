@@ -12,6 +12,7 @@
 - Prefer editing existing files over creating new ones
 - Default to writing no comments — only add one when the WHY is non-obvious
 - Don't create planning or analysis documents unless explicitly asked
+- When writing a plan (ExitPlanMode), prefix the plan filename with the repo name derived from `basename $(git rev-parse --show-toplevel)`, e.g. `<repo-name>-<description>.md`
 
 ## Security
 - Never read, print, or commit secrets, API keys, or credentials

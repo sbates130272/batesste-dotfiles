@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Prevent committing secrets that bootstrap merges into settings.local.json.
+set -euo pipefail
+
+SETTINGS="claude/.claude/settings.local.json"
+
+if git diff --cached --name-only | grep -qF "$SETTINGS"; then
+    if git show ":$SETTINGS" | grep -qE '"ANTHROPIC_API_KEY"|"ANTHROPIC_CUSTOM_HEADERS"'; then
+        echo "ERROR: $SETTINGS is staged and contains secrets (ANTHROPIC_API_KEY / ANTHROPIC_CUSTOM_HEADERS)." >&2
+        echo "       Bootstrap merges these at runtime — do not commit them." >&2
+        echo "       Run: git restore --staged $SETTINGS" >&2
+        exit 1
+    fi
+fi
