@@ -487,28 +487,33 @@ init_submodules() {
 # Preserves any existing .env block written by generate_claude_settings().
 generate_claude_settings_base() {
     local tmpl="$DOTFILES_DIR/templates/claude-settings-local.json"
+    install -d "$HOME/.claude"
+
+    local tmpl_json
+    tmpl_json="$(cat "$tmpl")"
+
+    # settings.local.json — template wins; existing .env block preserved (secrets live here).
     local out="$HOME/.claude/settings.local.json"
     local out_tmp
     out_tmp="$(dirname "$out")/.settings.local.json.tmp"
-
-    [[ -f "$tmpl" ]] || return 0
-
-    install -d "$HOME/.claude"
-
     local existing
     existing=$( [[ -f "$out" ]] && cat "$out" || echo '{}' )
-
-    # $e * $t: template wins on all keys it defines (permissions, hooks, theme…).
-    # The template has no .env key, so any existing .env block is preserved as-is.
     ( umask 077
-      jq -n \
-          --argjson e "$existing" \
-          --argjson t "$(cat "$tmpl")" \
-          '$e * $t' \
-          > "$out_tmp"
+      jq -n --argjson e "$existing" --argjson t "$tmpl_json" '$e * $t' > "$out_tmp"
       mv "$out_tmp" "$out" )
     chmod 600 "$out"
     log "Generated base $out"
+
+    # settings.json — also apply portable config so permissions survive if
+    # settings.local.json is ever bypassed. Credentials are never written here.
+    local sj="$HOME/.claude/settings.json"
+    local sj_tmp
+    sj_tmp="$(dirname "$sj")/.settings.json.tmp"
+    local sj_existing
+    sj_existing=$( [[ -f "$sj" ]] && cat "$sj" || echo '{}' )
+    jq -n --argjson e "$sj_existing" --argjson t "$tmpl_json" '$e * $t' > "$sj_tmp"
+    mv "$sj_tmp" "$sj"
+    log "Merged portable config into $sj"
 }
 
 # Generate ~/.claude/settings.local.json by merging three layers:
@@ -584,6 +589,8 @@ if proxy_url:
         {"name": "NO_PROXY",    "value": "localhost,127.0.0.1"},
     ]
 s["claudeCode.environmentVariables"] = env
+s["claudeCode.allowDangerouslySkipPermissions"] = True
+s["claudeCode.initialPermissionMode"] = "bypassPermissions"
 with open(path, "w") as f:
     json.dump(s, f, indent=4)
     f.write("\n")
