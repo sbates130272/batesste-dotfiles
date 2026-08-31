@@ -264,6 +264,7 @@ stow_package() {
         [[ "$_DO_FORCE" -eq 1 ]] && backup_conflicts "$pkg"
         log "Stowing $pkg"
         stow --dir="$DOTFILES_DIR" --target="$HOME" --restow "$pkg"
+        if [[ "$pkg" == "claude" ]]; then generate_claude_settings_base; fi
     else
         log "Skipping $pkg (directory not found)"
     fi
@@ -478,6 +479,36 @@ init_submodules() {
     [[ -f "$DOTFILES_DIR/.gitmodules" ]] || return 0
     log "Initialising git submodules"
     git -C "$DOTFILES_DIR" submodule update --init --recursive
+}
+
+# Generate the portable (non-secret) portion of ~/.claude/settings.local.json
+# from the template. Called every time the claude stow package is restowed so
+# permissions and hooks are available without needing secrets to be present.
+# Preserves any existing .env block written by generate_claude_settings().
+generate_claude_settings_base() {
+    local tmpl="$DOTFILES_DIR/templates/claude-settings-local.json"
+    local out="$HOME/.claude/settings.local.json"
+    local out_tmp
+    out_tmp="$(dirname "$out")/.settings.local.json.tmp"
+
+    [[ -f "$tmpl" ]] || return 0
+
+    install -d "$HOME/.claude"
+
+    local existing
+    existing=$( [[ -f "$out" ]] && cat "$out" || echo '{}' )
+
+    # $e * $t: template wins on all keys it defines (permissions, hooks, theme…).
+    # The template has no .env key, so any existing .env block is preserved as-is.
+    ( umask 077
+      jq -n \
+          --argjson e "$existing" \
+          --argjson t "$(cat "$tmpl")" \
+          '$e * $t' \
+          > "$out_tmp"
+      mv "$out_tmp" "$out" )
+    chmod 600 "$out"
+    log "Generated base $out"
 }
 
 # Generate ~/.claude/settings.local.json by merging three layers:
