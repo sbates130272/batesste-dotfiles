@@ -295,13 +295,13 @@ usage() {
 }
 
 main() {
-    check_deps
-    check_secrets_unlocked
-
     if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
         usage
         exit 0
     fi
+
+    check_deps
+    check_secrets_unlocked
 
     local args=()
     local pkg_name
