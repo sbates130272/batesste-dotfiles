@@ -21,7 +21,7 @@ jobs:
       - name: Check README lists every stow package
         run: |
           # Non-package directories (must match install.sh _NON_PACKAGES, plus .github)
-          NON_PACKAGES="templates scripts .github"
+          NON_PACKAGES="templates scripts vendor .github"
 
           # Collect actual stow packages from the repo root
           actual=()

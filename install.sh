@@ -13,7 +13,7 @@ _STATE_FILE="$_STATE_DIR/install-state"
 # envsubst inputs consumed by expand_templates() and scripts/ is run from the
 # repo; stowing either drops its contents straight into $HOME, which is how
 # ~/aws-credentials and friends appeared.
-_NON_PACKAGES=(templates scripts)
+_NON_PACKAGES=(templates scripts vendor)
 
 log() { echo "[dotfiles] $*"; }
 
@@ -339,6 +339,8 @@ main() {
 
     log "Installing dotfiles from $DOTFILES_DIR"
 
+    init_submodules
+
     # Both run before anything is stowed, so a stale or downgraded install is
     # reported while the tree is still untouched.
     check_relocation "${packages[@]}"
@@ -471,6 +473,12 @@ install_git_hooks() {
             log "Installed git hook: $name"
         fi
     done
+}
+
+init_submodules() {
+    [[ -f "$DOTFILES_DIR/.gitmodules" ]] || return 0
+    log "Initialising git submodules"
+    git -C "$DOTFILES_DIR" submodule update --init --recursive
 }
 
 run_host_bootstrap() {

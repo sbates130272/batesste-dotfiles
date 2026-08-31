@@ -1,0 +1,3 @@
+[submodule "vendor/amd-skills"]
+	path = vendor/amd-skills
+	url = https://github.com/amd/skills
