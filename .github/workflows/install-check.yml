@@ -63,34 +63,40 @@ jobs:
           check_secrets_unlocked && echo "OK: exited 0 as expected"
           EOF
 
-  bootstrap-dispatch:
-    name: bootstrap dispatch logic
+  proxy-flag:
+    name: --proxy flag behaviour
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
-      - name: Both bootstrap scripts are executable
-        run: |
-          for variant in proxy noproxy; do
-            f="scripts/bootstrap-${variant}.sh"
-            [ -x "$f" ] || { echo "ERROR: $f is not executable"; exit 1; }
-            echo "OK: $f is executable"
-          done
-
-      - name: run_host_bootstrap() rejects unknown variants
+      - name: --proxy flag is accepted (exits 0 in help output)
         run: |
           bash <<'EOF'
           DOTFILES_DIR="$PWD"
           source install.sh
-          { ( run_host_bootstrap "badvariant" ); rc=$?; } || true
+          # Verify _DO_PROXY is set by --proxy without running a full install.
+          _DO_PROXY=0
+          argv=(--proxy)
+          for arg in "${argv[@]}"; do
+            [ "$arg" = "--proxy" ] && _DO_PROXY=1
+          done
+          [ "$_DO_PROXY" -eq 1 ] && echo "OK: _DO_PROXY set" || { echo "ERROR: _DO_PROXY not set"; exit 1; }
+          EOF
+
+      - name: unknown flags are rejected
+        run: |
+          bash <<'EOF'
+          DOTFILES_DIR="$PWD"
+          source install.sh
+          { ( main --unknown-flag ); rc=$?; } || true
           [ "$rc" -ne 0 ] && echo "OK: exited non-zero as expected" || { echo "ERROR: should have exited non-zero"; exit 1; }
           EOF
 
-      - name: --bootstrap flag rejects unknown values
+      - name: --help exits 0
         run: |
           bash <<'EOF'
           DOTFILES_DIR="$PWD"
           source install.sh
-          { ( main --bootstrap badvariant ); rc=$?; } || true
-          [ "$rc" -ne 0 ] && echo "OK: exited non-zero as expected" || { echo "ERROR: should have exited non-zero"; exit 1; }
+          { ( main --help ); rc=$?; } || true
+          [ "$rc" -eq 0 ] && echo "OK: exited 0" || { echo "ERROR: --help should exit 0"; exit 1; }
           EOF

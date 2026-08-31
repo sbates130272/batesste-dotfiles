@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
-# Prevent committing secrets that bootstrap merges into settings.local.json.
+# Prevent accidentally committing secret values into the settings template.
+# install.sh injects API keys at generation time — they must never be in the template.
 set -euo pipefail
 
-SETTINGS="claude/.claude/settings.local.json"
+TEMPLATE="templates/claude-settings-local.json"
 
-if git diff --cached --name-only | grep -qF "$SETTINGS"; then
-    if git show ":$SETTINGS" | grep -qE '"ANTHROPIC_API_KEY"|"ANTHROPIC_CUSTOM_HEADERS"'; then
-        echo "ERROR: $SETTINGS is staged and contains secrets (ANTHROPIC_API_KEY / ANTHROPIC_CUSTOM_HEADERS)." >&2
-        echo "       Bootstrap merges these at runtime — do not commit them." >&2
-        echo "       Run: git restore --staged $SETTINGS" >&2
+if git diff --cached --name-only | grep -qF "$TEMPLATE"; then
+    if git show ":$TEMPLATE" | grep -qE '"ANTHROPIC_API_KEY"\s*:\s*"[^$]|"ANTHROPIC_CUSTOM_HEADERS"\s*:\s*"[^$]'; then
+        echo "ERROR: $TEMPLATE is staged and appears to contain a secret value." >&2
+        echo "       install.sh injects API keys at runtime — do not commit them into the template." >&2
+        echo "       Run: git restore --staged $TEMPLATE" >&2
         exit 1
     fi
 fi

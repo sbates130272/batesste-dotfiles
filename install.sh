@@ -4,6 +4,7 @@ set -euo pipefail
 DOTFILES_DIR="${DOTFILES_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 
 _DO_FORCE=0
+_DO_PROXY=0
 _DATESTAMP=""
 _OLD_ROOT=""
 _STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles"
@@ -270,13 +271,13 @@ stow_package() {
 
 
 usage() {
-    echo "Usage: $0 [--bootstrap] [--force] [packages...]"
+    echo "Usage: $0 [--proxy] [--force] [packages...]"
     echo ""
     echo "Options:"
-    echo "  --bootstrap proxy|noproxy"
-    echo "                Run a bootstrap script after stowing. Use 'proxy' for machines that"
-    echo "                reach llm-api.amd.com via a local tunnel (localhost:8888), or 'noproxy'"
-    echo "                for machines with direct AMD network access."
+    echo "  --proxy       Add HTTP_PROXY/HTTPS_PROXY env vars to the generated"
+    echo "                ~/.claude/settings.local.json and VS Code Machine settings."
+    echo "                Use on machines that reach llm-api.amd.com via a local tunnel"
+    echo "                on localhost:8888. Default is no proxy (direct AMD network access)."
     echo "  --force       Back up conflicting files before stowing (backup extension: .YYYYMMDD_HHMMSS),"
     echo "                and take over symlinks left behind by another checkout of this repo."
     echo ""
@@ -302,23 +303,20 @@ main() {
         exit 0
     fi
 
-    local do_bootstrap=""
     local args=()
     local pkg_name
     local argv=("$@")
     local i=0
     while [[ $i -lt ${#argv[@]} ]]; do
         local arg="${argv[$i]}"
-        if [[ "$arg" == "--bootstrap" ]]; then
-            i=$((i+1))
-            do_bootstrap="${argv[$i]:-}"
-            if [[ "$do_bootstrap" != "proxy" && "$do_bootstrap" != "noproxy" ]]; then
-                echo "ERROR: --bootstrap requires 'proxy' or 'noproxy'" >&2
-                exit 1
-            fi
+        if [[ "$arg" == "--proxy" ]]; then
+            _DO_PROXY=1
         elif [[ "$arg" == "--force" ]]; then
             _DO_FORCE=1
             _DATESTAMP="$(date +%Y%m%d_%H%M%S)"
+        elif [[ "$arg" == --* ]]; then
+            echo "ERROR: unknown option: $arg" >&2
+            exit 1
         else
             args+=("$arg")
         fi
@@ -352,12 +350,7 @@ main() {
 
     if [[ "$full_install" -eq 1 ]]; then
         expand_templates
-    fi
-    if [[ "${_DO_FORCE:-0}" -eq 1 || -n "$do_bootstrap" ]]; then
         install_git_hooks
-    fi
-    if [[ -n "$do_bootstrap" ]]; then
-        run_host_bootstrap "$do_bootstrap"
     fi
     record_install
     post_install_reminders
@@ -406,6 +399,8 @@ expand_templates() {
             GH_TOKEN_SBATES130272
             HF_TOKEN
             OPENROUTER_API_KEY
+            ANTHROPIC_API_KEY
+            ANTHROPIC_CUSTOM_HEADERS
         )
         for var in "${required[@]}"; do
             [[ -z "${!var:-}" ]] && missing+=("$var")
@@ -451,7 +446,11 @@ expand_templates() {
         printf 'export OPENROUTER_API_KEY=%s\n' "$OPENROUTER_API_KEY" > "$HOME/.config/openrouter-env.sh"
         chmod 600 "$HOME/.config/openrouter-env.sh"
         log "Expanded openrouter-env.sh"
+
+        generate_claude_settings
+        generate_vscode_settings
     )
+    install_amd_skills
 }
 
 install_git_hooks() {
@@ -481,15 +480,99 @@ init_submodules() {
     git -C "$DOTFILES_DIR" submodule update --init --recursive
 }
 
-run_host_bootstrap() {
-    local type="$1"
-    local script="$DOTFILES_DIR/scripts/bootstrap-${type}.sh"
-    if [[ ! -x "$script" ]]; then
-        echo "ERROR: bootstrap script not found or not executable: $script" >&2
-        exit 1
+# Generate ~/.claude/settings.local.json by merging three layers:
+#   existing file (preserves keys from other tools) <- template (portable config wins)
+# then inject the .env block: existing env + template env + secrets (secrets win).
+# Called inside the expand_templates() subshell so secrets are already exported.
+generate_claude_settings() {
+    local tmpl="$DOTFILES_DIR/templates/claude-settings-local.json"
+    local out="$HOME/.claude/settings.local.json"
+    local out_tmp
+    out_tmp="$(dirname "$out")/.settings.local.json.tmp"
+
+    install -d "$HOME/.claude"
+
+    local existing
+    existing=$( [[ -f "$out" ]] && cat "$out" || echo '{}' )
+
+    local env_add
+    env_add=$(jq -n \
+        --arg ca   "/etc/ssl/certs/ca-certificates.crt" \
+        --arg hdrs "$ANTHROPIC_CUSTOM_HEADERS" \
+        --arg key  "$ANTHROPIC_API_KEY" \
+        '{NODE_EXTRA_CA_CERTS:$ca,ANTHROPIC_CUSTOM_HEADERS:$hdrs,ANTHROPIC_API_KEY:$key}')
+
+    if [[ "$_DO_PROXY" -eq 1 ]]; then
+        env_add=$(jq \
+            '. + {HTTP_PROXY:"http://localhost:8888",HTTPS_PROXY:"http://localhost:8888",NO_PROXY:"localhost,127.0.0.1"}' \
+            <<<"$env_add")
     fi
-    log "Running bootstrap: $script"
-    "$script"
+
+    ( umask 077
+      jq -n \
+          --argjson e "$existing" \
+          --argjson t "$(cat "$tmpl")" \
+          --argjson a "$env_add" \
+          '$e * $t | .env = (($e.env // {}) * ($t.env // {}) * $a)' \
+          > "$out_tmp"
+      mv "$out_tmp" "$out" )
+    chmod 600 "$out"
+    log "Generated $out"
+}
+
+# Write ~/.vscode-server/data/Machine/settings.json so the VS Code extension
+# picks up the AMD API gateway credentials and model names.
+# Called inside the expand_templates() subshell so secrets are already exported.
+generate_vscode_settings() {
+    local vscode_settings="$HOME/.vscode-server/data/Machine/settings.json"
+    install -d "$(dirname "$vscode_settings")"
+    [[ -f "$vscode_settings" ]] || echo '{}' > "$vscode_settings"
+
+    local proxy_url=""
+    [[ "$_DO_PROXY" -eq 1 ]] && proxy_url="http://localhost:8888"
+
+    python3 - "$vscode_settings" "$ANTHROPIC_CUSTOM_HEADERS" "$ANTHROPIC_API_KEY" "$proxy_url" <<'PYEOF'
+import sys, json
+path, custom_headers, api_key, proxy_url = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+with open(path) as f:
+    s = json.load(f)
+env = [
+    {"name": "ANTHROPIC_CUSTOM_HEADERS",       "value": custom_headers},
+    {"name": "ANTHROPIC_API_KEY",              "value": api_key},
+    {"name": "NODE_EXTRA_CA_CERTS",            "value": "/etc/ssl/certs/ca-certificates.crt"},
+    {"name": "ANTHROPIC_BASE_URL",             "value": "https://llm-api.amd.com/Anthropic"},
+    {"name": "ANTHROPIC_MODEL",                "value": "Claude-Opus-5[1m]"},
+    {"name": "ANTHROPIC_DEFAULT_OPUS_MODEL",   "value": "Claude-Opus-5[1m]"},
+    {"name": "ANTHROPIC_DEFAULT_SONNET_MODEL", "value": "Claude-Sonnet-4.6"},
+    {"name": "ANTHROPIC_DEFAULT_HAIKU_MODEL",  "value": "Claude-Haiku-4.5"},
+]
+if proxy_url:
+    env += [
+        {"name": "HTTP_PROXY",  "value": proxy_url},
+        {"name": "HTTPS_PROXY", "value": proxy_url},
+        {"name": "NO_PROXY",    "value": "localhost,127.0.0.1"},
+    ]
+s["claudeCode.environmentVariables"] = env
+with open(path, "w") as f:
+    json.dump(s, f, indent=4)
+    f.write("\n")
+PYEOF
+    log "Generated $vscode_settings"
+}
+
+install_amd_skills() {
+    local skills_src="$DOTFILES_DIR/vendor/amd-skills/skills"
+    [[ -d "$skills_src" ]] || {
+        echo "WARNING: $skills_src not found — run: git submodule update --init" >&2
+        return 0
+    }
+    install -d "$HOME/.claude/skills"
+    for _skill_dir in "$skills_src"/*/; do
+        [[ -d "$_skill_dir" ]] || continue
+        _skill_name="$(basename "$_skill_dir")"
+        cp -r "$_skill_dir" "$HOME/.claude/skills/$_skill_name"
+        log "Installed AMD skill: $_skill_name"
+    done
 }
 
 check_gpg_key() {

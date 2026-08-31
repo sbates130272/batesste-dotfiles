@@ -55,11 +55,11 @@ git-crypt unlock    # requires your GPG private key
 ./install.sh
 ```
 
-On a fresh machine, run bootstrap after stowing to write `~/.claude/settings.local.json`, the VS Code Machine settings, and install the [AMD skills](https://github.com/amd/skills) into `~/.claude/skills/`. Pass `proxy` for machines that reach the AMD API gateway via an SSH reverse tunnel on `localhost:8888`, or `noproxy` for machines with direct AMD network access:
+A full install (no package arguments) also generates `~/.claude/settings.local.json` from `templates/claude-settings-local.json`, writes the VS Code Machine settings, and installs the [AMD skills](https://github.com/amd/skills) into `~/.claude/skills/`. Pass `--proxy` on machines that reach the AMD API gateway via an SSH reverse tunnel on `localhost:8888`; omit it on machines with direct AMD network access (e.g. WSL2 behind ZScaler):
 
 ```bash
-./install.sh --bootstrap proxy     # SSH-tunnel machines
-./install.sh --bootstrap noproxy   # direct AMD network access
+./install.sh           # direct AMD network access (default)
+./install.sh --proxy   # SSH-tunnel machines (adds HTTP_PROXY vars)
 ```
 
 Install specific packages only:
@@ -99,17 +99,6 @@ Secrets are stored encrypted in this repo using [git-crypt](https://github.com/A
 `install.sh` uses `envsubst` to expand templates in `templates/` into `$HOME` after sourcing the secrets file. Some secrets are written directly to well-known locations rather than exported as shell environment variables.
 
 Secrets are encrypted with git-crypt. Import your GPG private key before running `git-crypt unlock`.
-
-## Machine-local Claude settings
-
-`claude/settings.local.json` is excluded from stow (via `claude/.stow-local-ignore`) so each machine manages it independently. Two bootstrap scripts write the correct `settings.local.json` and the VS Code Machine `settings.json` for a given network topology:
-
-| Script | When to use |
-| --- | --- |
-| `scripts/bootstrap-proxy.sh` | Machines that reach `llm-api.amd.com` via an SSH reverse tunnel on `localhost:8888` (e.g. bare Linux boxes without ZScaler) |
-| `scripts/bootstrap-noproxy.sh` | Machines with direct AMD network access (e.g. WSL2 behind ZScaler) |
-
-Invoke via `./install.sh --bootstrap proxy` or `./install.sh --bootstrap noproxy` — see the Install section above.
 
 ## Notes
 
