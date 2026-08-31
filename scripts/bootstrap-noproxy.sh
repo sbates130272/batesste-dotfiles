@@ -65,3 +65,18 @@ with open(path, "w") as f:
     f.write("\n")
 PYEOF
 echo "[dotfiles] Updated $VSCODE_SETTINGS"
+
+# Install AMD skills from the vendored submodule into ~/.claude/skills/.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+AMD_SKILLS_SRC="$(cd "$SCRIPT_DIR/.." && pwd)/vendor/amd-skills"
+if [[ -d "$AMD_SKILLS_SRC/skills" ]]; then
+    install -d "$HOME/.claude/skills"
+    for _skill_dir in "$AMD_SKILLS_SRC/skills"/*/; do
+        [[ -d "$_skill_dir" ]] || continue
+        _skill_name="$(basename "$_skill_dir")"
+        cp -r "$_skill_dir" "$HOME/.claude/skills/$_skill_name"
+        echo "[dotfiles] Installed AMD skill: $_skill_name"
+    done
+else
+    echo "WARNING: $AMD_SKILLS_SRC/skills not found — run: git submodule update --init" >&2
+fi

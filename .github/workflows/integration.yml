@@ -22,6 +22,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       # ── Dependencies ────────────────────────────────────────────────────────
       - name: Install apt dependencies
@@ -121,6 +123,16 @@ jobs:
           check_link "$HOME/.emacs.d/init.el"               "$REPO"
           check_link "$HOME/.ansible.cfg"                    "$REPO"
           exit $failed
+
+      # ── AMD skills submodule ────────────────────────────────────────────────
+      - name: Verify vendor/amd-skills submodule populated
+        run: |
+          for f in \
+            vendor/amd-skills/.claude-plugin/marketplace.json \
+            vendor/amd-skills/skills
+          do
+            [ -e "$f" ] && echo "OK: $f" || { echo "ERROR: $f missing (submodule not populated)"; exit 1; }
+          done
 
       # ── Template expansion ──────────────────────────────────────────────────
       - name: Verify template expansions

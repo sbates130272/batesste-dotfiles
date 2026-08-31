@@ -30,10 +30,11 @@ secrets/       # ~/.secrets.env (git-crypt encrypted)
 ssh/           # ~/.ssh/config
 ```
 
-Run `./install.sh` from the repo root to stow all packages. Two directories are **not** stow packages and their contents stay in the repo:
+Run `./install.sh` from the repo root to stow all packages. Three directories are **not** stow packages and their contents stay in the repo:
 
 - `templates/` — `envsubst` inputs expanded by `install.sh` into `$HOME` at install time
 - `scripts/` — bootstrap and helper scripts invoked directly from the repo
+- `vendor/` — vendored external content (git submodules); currently contains [amd/skills](https://github.com/amd/skills)
 
 ## Requirements
 
@@ -48,13 +49,13 @@ Your GPG private key must be available on any new machine (used for both commit 
 ## Install
 
 ```bash
-git clone git@github.com:sbates130272/batesste-dotfiles.git <install-location>
+git clone --recurse-submodules git@github.com:sbates130272/batesste-dotfiles.git <install-location>
 cd <install-location>
 git-crypt unlock    # requires your GPG private key
 ./install.sh
 ```
 
-On a fresh machine, run bootstrap after stowing to write `~/.claude/settings.local.json` and the VS Code Machine settings. Pass `proxy` for machines that reach the AMD API gateway via an SSH reverse tunnel on `localhost:8888`, or `noproxy` for machines with direct AMD network access:
+On a fresh machine, run bootstrap after stowing to write `~/.claude/settings.local.json`, the VS Code Machine settings, and install the [AMD skills](https://github.com/amd/skills) into `~/.claude/skills/`. Pass `proxy` for machines that reach the AMD API gateway via an SSH reverse tunnel on `localhost:8888`, or `noproxy` for machines with direct AMD network access:
 
 ```bash
 ./install.sh --bootstrap proxy     # SSH-tunnel machines

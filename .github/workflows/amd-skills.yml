@@ -1,0 +1,50 @@
+name: AMD Skills
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: amd-skills-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  amd-skills-install:
+    name: submodule structure and install
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Verify submodule structure
+        run: |
+          for f in \
+            vendor/amd-skills/.claude-plugin/marketplace.json \
+            vendor/amd-skills/plugin-metadata.json \
+            vendor/amd-skills/skills
+          do
+            [ -e "$f" ] && echo "OK: $f" || { echo "ERROR: $f missing"; exit 1; }
+          done
+
+      - name: Install AMD skills from submodule
+        run: |
+          install -d "$HOME/.claude/skills"
+          for skill_dir in vendor/amd-skills/skills/*/; do
+            [ -d "$skill_dir" ] || continue
+            skill_name="$(basename "$skill_dir")"
+            cp -r "$skill_dir" "$HOME/.claude/skills/$skill_name"
+            echo "Installed: $skill_name"
+          done
+
+      - name: Verify skills installed
+        run: |
+          failed=0
+          for skill in local-ai-use local-ai-app-integration serving-llms-on-instinct; do
+            f="$HOME/.claude/skills/$skill/SKILL.md"
+            [ -f "$f" ] && echo "OK: $f" || { echo "ERROR: $f missing"; failed=1; }
+          done
+          exit $failed
