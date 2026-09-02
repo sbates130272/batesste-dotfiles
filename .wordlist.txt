@@ -35,3 +35,6 @@ pmem
 envsubst
 env
 natively
+GH
+github
+uppercased
