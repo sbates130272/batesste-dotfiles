@@ -15,17 +15,3 @@ if [ -d "$HOME/bin" ] ; then
     PATH="$HOME/bin:$PATH"
 fi
 
-# Include ~/.local/bin in PATH if it exists
-if [ -d "$HOME/.local/bin" ] ; then
-    PATH="$HOME/.local/bin:$PATH"
-fi
-
-# ROCm WSL environment
-if [ -f "$HOME/.config/rocm/wsl-env.sh" ]; then
-  . "$HOME/.config/rocm/wsl-env.sh"
-fi
-
-# Claude Code gateway env (also sourced from .bashrc; harmless if repeated)
-if [ -f "$HOME/.config/claude/env.sh" ]; then
-  . "$HOME/.config/claude/env.sh"
-fi

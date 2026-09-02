@@ -26,6 +26,7 @@ docker/        # ~/.docker/daemon.json
 emacs/         # ~/.emacs, ~/.emacs.d/init.el
 gh/            # ~/.config/gh/config.yml (non-secret gh settings)
 git/           # ~/.gitconfig, ~/.config/git/hooks/pre-commit
+gpg/           # ~/.gnupg/gpg-agent.conf (pinentry and agent settings)
 secrets/       # ~/.secrets.env (git-crypt encrypted)
 ssh/           # ~/.ssh/config
 ```
@@ -99,6 +100,49 @@ Secrets are stored encrypted in this repo using [git-crypt](https://github.com/A
 `install.sh` uses `envsubst` to expand templates in `templates/` into `$HOME` after sourcing the secrets file. Some secrets are written directly to well-known locations rather than exported as shell environment variables.
 
 Secrets are encrypted with git-crypt. Import your GPG private key before running `git-crypt unlock`.
+
+## GitHub tokens
+
+GitHub tokens for all accounts live in `secrets/.secrets.env` and are written to `~/.config/gh/` by `install.sh`.
+
+### Naming convention
+
+| Variable | Purpose |
+| --- | --- |
+| `GH_TOKEN_<ACCOUNT>` | Active token for that account (used by `gh` CLI via `~/.config/gh/hosts.yml`) |
+| `GH_TOKEN_<ACCOUNT>_EXPIRES` | Expiry date in `YYYY-MM-DD` format |
+| `GH_TOKEN_<ACCOUNT>_<SCOPE>` | Alternate scoped token for the same account (e.g. `_ROCM` for ROCm org access) |
+| `GH_TOKEN_<ACCOUNT>_<SCOPE>_EXPIRES` | Expiry date for that scoped token |
+
+`<ACCOUNT>` is the GitHub username uppercased with hyphens replaced by underscores, e.g. `SBATES130272` or `STEBATES_AMDENG`.
+
+### Adding a new token or expiry date
+
+1. Unlock secrets: `git-crypt unlock`
+2. Edit `secrets/.secrets.env` and add the token and (recommended) its expiry:
+
+   ```bash
+   GH_TOKEN_SBATES130272=github_pat_...
+   GH_TOKEN_SBATES130272_EXPIRES=2026-12-01
+
+   # Optional scoped PAT for ROCm org access
+   GH_TOKEN_SBATES130272_ROCM=github_pat_...
+   GH_TOKEN_SBATES130272_ROCM_EXPIRES=2026-12-15
+   ```
+
+3. Re-run `./install.sh` to regenerate `~/.config/gh/tokens.env` and `~/.config/gh/hosts.yml`.
+4. Reload your shell (`source ~/.bashrc`) or open a new terminal.
+
+Adding a new `_<SCOPE>` token beyond `_ROCM` also requires a matching block in the `expand_templates()` function in `install.sh`.
+
+### Checking and using tokens
+
+```bash
+gh-token-check                            # show days until expiry for all registered tokens
+gh-as SBATES130272_ROCM repo list ROCm    # run any gh command with a named alternate token
+```
+
+`gh-token-check` warns at 14 days and flags expired tokens. Both functions are defined in `bash/.bashrc` and available in any interactive shell once `~/.config/gh/tokens.env` has been generated.
 
 ## Notes
 

@@ -126,6 +126,51 @@ if [ -f "$HOME/.config/openrouter-env.sh" ]; then
   . "$HOME/.config/openrouter-env.sh"
 fi
 
+# GitHub token registry (expiry tracking + optional extra PATs)
+if [ -f "$HOME/.config/gh/tokens.env" ]; then
+  . "$HOME/.config/gh/tokens.env"
+fi
+
+# Check expiry of all registered GitHub tokens.
+# Warns at 14 days; errors at 0 days.
+gh-token-check() {
+  local today warn_days=14
+  today=$(date +%s)
+  local found=0
+
+  while IFS= read -r line; do
+    [[ "$line" =~ ^export\ (GH_TOKEN_[A-Z0-9_]+)_EXPIRES=\'([0-9]{4}-[0-9]{2}-[0-9]{2})\' ]] || continue
+    local name="${BASH_REMATCH[1]}" expiry="${BASH_REMATCH[2]}"
+    local exp_ts days_left
+    exp_ts=$(date -d "$expiry" +%s 2>/dev/null) || continue
+    days_left=$(( (exp_ts - today) / 86400 ))
+    found=1
+    if   [[ $days_left -le 0 ]];         then echo "EXPIRED  $name (expired $expiry)"
+    elif [[ $days_left -le $warn_days ]]; then echo "WARNING  $name expires in ${days_left}d ($expiry)"
+    else                                       echo "OK       $name expires in ${days_left}d ($expiry)"
+    fi
+  done < "$HOME/.config/gh/tokens.env"
+
+  [[ $found -eq 0 ]] && echo "No expiry dates registered. Add GH_TOKEN_<NAME>_EXPIRES=YYYY-MM-DD to secrets/.secrets.env."
+}
+
+# Run a gh command using a named alternate token.
+# Usage: gh-as SBATES130272_ROCM repo list ROCm --limit 5
+gh-as() {
+  if [[ $# -lt 2 ]]; then
+    echo "Usage: gh-as <TOKEN_NAME> <gh args...>" >&2
+    return 1
+  fi
+  local var="GH_TOKEN_${1}"
+  local token="${!var:-}"
+  if [[ -z "$token" ]]; then
+    echo "gh-as: token \$${var} is not set (run install.sh after adding it to secrets)" >&2
+    return 1
+  fi
+  shift
+  GITHUB_TOKEN="$token" gh "$@"
+}
+
 
 export EDITOR=emacs
 export HF_HOME="$HOME/.cache/huggingface"
