@@ -564,7 +564,7 @@ generate_claude_settings() {
 
     if [[ "$_DO_PROXY" -eq 1 ]]; then
         env_add=$(jq \
-            '. + {HTTP_PROXY:"http://localhost:8888",HTTPS_PROXY:"http://localhost:8888",NO_PROXY:"localhost,127.0.0.1"}' \
+            '. + {HTTP_PROXY:"http://127.0.0.1:8888",HTTPS_PROXY:"http://127.0.0.1:8888",NO_PROXY:"localhost,127.0.0.1"}' \
             <<<"$env_add")
     fi
 
@@ -589,7 +589,7 @@ generate_vscode_settings() {
     [[ -f "$vscode_settings" ]] || echo '{}' > "$vscode_settings"
 
     local proxy_url=""
-    [[ "$_DO_PROXY" -eq 1 ]] && proxy_url="http://localhost:8888"
+    [[ "$_DO_PROXY" -eq 1 ]] && proxy_url="http://127.0.0.1:8888"
 
     python3 - "$vscode_settings" "$ANTHROPIC_CUSTOM_HEADERS" "$ANTHROPIC_API_KEY" "$proxy_url" <<'PYEOF'
 import sys, json
@@ -601,8 +601,8 @@ env = [
     {"name": "ANTHROPIC_API_KEY",              "value": api_key},
     {"name": "NODE_EXTRA_CA_CERTS",            "value": "/etc/ssl/certs/ca-certificates.crt"},
     {"name": "ANTHROPIC_BASE_URL",             "value": "https://llm-api.amd.com/Anthropic"},
-    {"name": "ANTHROPIC_MODEL",                "value": "Claude-Opus-5[1m]"},
-    {"name": "ANTHROPIC_DEFAULT_OPUS_MODEL",   "value": "Claude-Opus-5[1m]"},
+    {"name": "ANTHROPIC_MODEL",                "value": "Claude-Opus-5"},
+    {"name": "ANTHROPIC_DEFAULT_OPUS_MODEL",   "value": "Claude-Opus-5"},
     {"name": "ANTHROPIC_DEFAULT_SONNET_MODEL", "value": "Claude-Sonnet-4.6"},
     {"name": "ANTHROPIC_DEFAULT_HAIKU_MODEL",  "value": "Claude-Haiku-4.5"},
 ]
