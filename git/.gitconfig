@@ -9,5 +9,7 @@
 	gpgsign = true
 [pull]
 	rebase = false
+[push]
+	default = simple
 [init]
 	defaultBranch = main
