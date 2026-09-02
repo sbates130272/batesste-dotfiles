@@ -26,6 +26,7 @@ docker/        # ~/.docker/daemon.json
 emacs/         # ~/.emacs, ~/.emacs.d/init.el
 gh/            # ~/.config/gh/config.yml (non-secret gh settings)
 git/           # ~/.gitconfig, ~/.config/git/hooks/pre-commit
+gpg/           # ~/.gnupg/gpg-agent.conf (pinentry and agent settings)
 secrets/       # ~/.secrets.env (git-crypt encrypted)
 ssh/           # ~/.ssh/config
 ```
