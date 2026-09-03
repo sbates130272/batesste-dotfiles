@@ -403,6 +403,7 @@ expand_templates() {
             ANTHROPIC_API_KEY
             ANTHROPIC_CUSTOM_HEADERS
             ANSIBLE_GALAXY_TOKEN
+            GRAFANA_HOMELAB_TOKEN
         )
         for var in "${required[@]}"; do
             [[ -z "${!var:-}" ]] && missing+=("$var")
@@ -482,6 +483,10 @@ expand_templates() {
         printf 'export OPENROUTER_API_KEY=%s\n' "$OPENROUTER_API_KEY" > "$HOME/.config/openrouter-env.sh"
         chmod 600 "$HOME/.config/openrouter-env.sh"
         log "Expanded openrouter-env.sh"
+
+        printf 'export GRAFANA_HOMELAB_TOKEN=%s\n' "$GRAFANA_HOMELAB_TOKEN" > "$HOME/.config/grafana-env.sh"
+        chmod 600 "$HOME/.config/grafana-env.sh"
+        log "Expanded grafana-env.sh"
 
         generate_claude_settings
         generate_vscode_settings

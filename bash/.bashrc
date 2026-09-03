@@ -126,6 +126,11 @@ if [ -f "$HOME/.config/openrouter-env.sh" ]; then
   . "$HOME/.config/openrouter-env.sh"
 fi
 
+# Grafana homelab token (written by install.sh from encrypted secrets)
+if [ -f "$HOME/.config/grafana-env.sh" ]; then
+  . "$HOME/.config/grafana-env.sh"
+fi
+
 # GitHub token registry (expiry tracking + optional extra PATs)
 if [ -f "$HOME/.config/gh/tokens.env" ]; then
   . "$HOME/.config/gh/tokens.env"
