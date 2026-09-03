@@ -173,7 +173,9 @@ gh-as() {
 
 
 export EDITOR=emacs
-export HF_HOME="$HOME/.cache/huggingface"
+if [ -f "$HOME/.config/huggingface-env.sh" ]; then
+  . "$HOME/.config/huggingface-env.sh"
+fi
 
 # PATH additions (deduplicated)
 export PATH="$HOME/.local/bin:$PATH"
