@@ -468,6 +468,11 @@ expand_templates() {
         chmod 600 "$HOME/.cache/huggingface/token"
         log "Expanded huggingface/token"
 
+        install -d "$HOME/.config"
+        printf 'export HF_HOME=%s\nexport HF_TOKEN=%s\n' "$HOME/.cache/huggingface" "$HF_TOKEN" > "$HOME/.config/huggingface-env.sh"
+        chmod 600 "$HOME/.config/huggingface-env.sh"
+        log "Expanded huggingface-env.sh"
+
         install -d "$HOME/.ansible"
         printf '%s' "$ANSIBLE_GALAXY_TOKEN" > "$HOME/.ansible/galaxy_token"
         chmod 600 "$HOME/.ansible/galaxy_token"
