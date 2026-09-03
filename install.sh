@@ -403,6 +403,7 @@ expand_templates() {
             ANTHROPIC_API_KEY
             ANTHROPIC_CUSTOM_HEADERS
             ANSIBLE_GALAXY_TOKEN
+            GRAFANA_HOMELAB_TOKEN
         )
         for var in "${required[@]}"; do
             [[ -z "${!var:-}" ]] && missing+=("$var")
@@ -483,8 +484,29 @@ expand_templates() {
         chmod 600 "$HOME/.config/openrouter-env.sh"
         log "Expanded openrouter-env.sh"
 
+        printf 'export GRAFANA_HOMELAB_TOKEN=%s\n' "$GRAFANA_HOMELAB_TOKEN" > "$HOME/.config/grafana-env.sh"
+        chmod 600 "$HOME/.config/grafana-env.sh"
+        log "Expanded grafana-env.sh"
+
         generate_claude_settings
         generate_vscode_settings
+
+        # Pre-approve the custom API key so the VS Code extension doesn't show
+        # the onboarding wizard on first launch.
+        local claude_json="$HOME/.claude.json"
+        [[ -f "$claude_json" ]] || echo '{}' > "$claude_json"
+        python3 - "$claude_json" "$ANTHROPIC_API_KEY" <<'PYEOF'
+import json, sys
+path, key = sys.argv[1], sys.argv[2]
+with open(path) as f:
+    d = json.load(f)
+r = d.setdefault("customApiKeyResponses", {"approved": [], "rejected": []})
+if key not in r["approved"]:
+    r["approved"].append(key)
+with open(path, "w") as f:
+    json.dump(d, f, indent=2)
+PYEOF
+        log "Pre-approved API key in $claude_json"
     )
     install_amd_skills
 }
