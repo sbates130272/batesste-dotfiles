@@ -402,6 +402,7 @@ expand_templates() {
             OPENROUTER_API_KEY
             ANTHROPIC_API_KEY
             ANTHROPIC_CUSTOM_HEADERS
+            ANSIBLE_GALAXY_TOKEN
         )
         for var in "${required[@]}"; do
             [[ -z "${!var:-}" ]] && missing+=("$var")
@@ -466,6 +467,11 @@ expand_templates() {
         printf '%s' "$HF_TOKEN" > "$HOME/.cache/huggingface/token"
         chmod 600 "$HOME/.cache/huggingface/token"
         log "Expanded huggingface/token"
+
+        install -d "$HOME/.ansible"
+        printf '%s' "$ANSIBLE_GALAXY_TOKEN" > "$HOME/.ansible/galaxy_token"
+        chmod 600 "$HOME/.ansible/galaxy_token"
+        log "Expanded ansible/galaxy_token"
 
         install -d "$HOME/.config"
         printf 'export OPENROUTER_API_KEY=%s\n' "$OPENROUTER_API_KEY" > "$HOME/.config/openrouter-env.sh"
