@@ -23,8 +23,6 @@
       "Read(./appsettings.*.json)",
       "Read(~/.netrc)",
       "Read(~/.gitconfig)",
-      "Bash(curl:*)",
-      "Bash(wget:*)",
       "Bash(rm -rf:*)",
       "Bash(env:*)",
       "Bash(printenv:*)",
