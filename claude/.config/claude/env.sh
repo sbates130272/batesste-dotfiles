@@ -4,18 +4,18 @@
 # Sourced, never executed, so there is no shebang; .profile may be read by a
 # POSIX sh, so keep this file to plain exports.
 #
-# Reaches login shells via .profile and interactive shells via .bashrc. It does
-# NOT reach `bash -c`, which reads neither, so anything launching Claude Code
-# without a login shell (the VS Code extension) needs these set separately --
-# see claudeCode.environmentVariables in scripts/bootstrap-<host>.sh.
+# Reaches login shells via .profile and interactive shells via .bashrc. The VS
+# Code extension (which launches without a login shell) gets these vars via
+# claudeCode.environmentVariables, written to ~/.vscode-server/data/Machine/
+# settings.json by install.sh's generate_vscode_settings().
 #
 # These live here rather than in ~/.claude/settings.json because third-party
 # installers (.pixel-agents) rewrite settings.json from scratch, replacing the
 # stow symlink and dropping its env block. Keeping the gateway config in the
 # environment means a clobbered settings.json costs hooks, not connectivity.
 #
-# Sourced from both .profile and .bashrc so non-interactive shells (VS Code
-# remote, `ssh host cmd`) get it too.
+# Sourced from both .profile and .bashrc so non-interactive shells
+# (ssh host cmd) get it too.
 
 export ANTHROPIC_BASE_URL="https://llm-api.amd.com/Anthropic"
 
