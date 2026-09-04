@@ -404,6 +404,7 @@ expand_templates() {
             ANTHROPIC_CUSTOM_HEADERS
             ANSIBLE_GALAXY_TOKEN
             GRAFANA_HOMELAB_TOKEN
+            LEMONADE_API_KEY
         )
         for var in "${required[@]}"; do
             [[ -z "${!var:-}" ]] && missing+=("$var")
@@ -487,6 +488,10 @@ expand_templates() {
         printf 'export GRAFANA_HOMELAB_TOKEN=%s\n' "$GRAFANA_HOMELAB_TOKEN" > "$HOME/.config/grafana-env.sh"
         chmod 600 "$HOME/.config/grafana-env.sh"
         log "Expanded grafana-env.sh"
+
+        printf 'export LEMONADE_API_KEY=%s\n' "$LEMONADE_API_KEY" > "$HOME/.config/lemonade-env.sh"
+        chmod 600 "$HOME/.config/lemonade-env.sh"
+        log "Expanded lemonade-env.sh"
 
         generate_claude_settings
         generate_vscode_settings

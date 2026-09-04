@@ -131,6 +131,11 @@ if [ -f "$HOME/.config/grafana-env.sh" ]; then
   . "$HOME/.config/grafana-env.sh"
 fi
 
+# Lemonade API key (written by install.sh from encrypted secrets)
+if [ -f "$HOME/.config/lemonade-env.sh" ]; then
+  . "$HOME/.config/lemonade-env.sh"
+fi
+
 # GitHub token registry (expiry tracking + optional extra PATs)
 if [ -f "$HOME/.config/gh/tokens.env" ]; then
   . "$HOME/.config/gh/tokens.env"
