@@ -22,7 +22,7 @@ jobs:
       # changelog degrades to a single auto-generated branch name. GitHub lists
       # the merged PRs themselves, which survives squashing.
       - name: Create release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           name: ${{ github.ref_name }}
           generate_release_notes: true
