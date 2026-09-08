@@ -119,7 +119,6 @@ jobs:
           check_link "$HOME/.config/gh/config.yml"          "$REPO"
           check_link "$HOME/.aws/config"                     "$REPO"
           check_link "$HOME/.ssh/config"                     "$REPO"
-          check_link "$HOME/.emacs"                          "$REPO"
           check_link "$HOME/.emacs.d/init.el"               "$REPO"
           check_link "$HOME/.ansible.cfg"                    "$REPO"
           exit $failed
@@ -260,34 +259,24 @@ jobs:
           cat "$f"
 
       # ── Emacs ───────────────────────────────────────────────────────────────
-      # .emacs requires rust-mode which is not installed by default. We verify
-      # that emacs starts and that init.el loads without crashing (it only
-      # configures package archives). The .emacs file itself is loaded in a
-      # separate pass with rust-mode stubbed out so we catch parse errors there
-      # too, without requiring ELPA package installation in CI.
+      # init.el installs rust-mode on first run. Stub out network calls and
+      # the package-install/require so the test is hermetic in CI.
       - name: emacs --version
         run: emacs --version
 
       - name: emacs init.el loads in batch mode
         run: |
-          # init.el calls package-refresh-contents which hits the network.
-          # Stub it out so the test is hermetic, then load init.el directly.
           emacs --batch --eval "
             (fset 'package-refresh-contents (lambda (&rest _) nil))
             (fset 'package-initialize (lambda (&rest _) nil))
-            (load \"$HOME/.emacs.d/init.el\")
-            (message \"init.el OK\")"
-
-      - name: .emacs loads in batch mode (rust-mode stubbed)
-        run: |
-          # Stub require so rust-mode (not installed) does not abort the load.
-          emacs --batch --eval "
+            (fset 'package-install (lambda (&rest _) nil))
+            (fset 'package-installed-p (lambda (&rest _) t))
             (fset 'original-require (symbol-function 'require))
             (fset 'require (lambda (feature &rest args)
               (unless (eq feature 'rust-mode)
                 (apply 'original-require feature args))))
-            (load \"$HOME/.emacs\")
-            (message \".emacs OK\")"
+            (load \"$HOME/.emacs.d/init.el\")
+            (message \"init.el OK\")"
 
       # ── Ansible ─────────────────────────────────────────────────────────────
       - name: ansible version
