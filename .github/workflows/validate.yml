@@ -16,7 +16,7 @@ jobs:
     name: no live secrets in plaintext files
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Check secrets.env is git-crypt encrypted
         run: |
@@ -71,7 +71,7 @@ jobs:
     name: stow package structure
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install stow
         run: sudo apt-get update && sudo apt-get install -y stow
