@@ -102,6 +102,19 @@ for file in "${staged[@]}"; do
         matches="$(comm -23 <(printf '%s\n' "$matches" | sort) <(printf '%s\n' "$sha_bare" | sort) || true)"
         [[ -z "$matches" ]] && continue
 
+        # Discard matches that are absolute filesystem paths. The separator
+        # is inside the high-entropy character class, so a path with ordinary
+        # directory names satisfies it while carrying no secret at all —
+        # /etc/prometheus/targets/discovered/alloy is 39 characters of plain
+        # directory. This is the same class of structural false positive the
+        # patches/ allowlist above exists for, but it shows up in any config
+        # that names a deep path, so filter the value rather than skipping
+        # the whole file. Anchored on real filesystem roots: a base64 blob
+        # does not begin with /etc/, so credentials are still caught.
+        path_lines="$(git diff --cached -- "$file" | grep -P '^\+[^+]' | grep -oP '(?<![A-Za-z0-9])/(?:etc|usr|var|home|opt|srv|tmp)/(?:[A-Za-z0-9._+-]+/)*[A-Za-z0-9._+-]+' | grep -oP "$regex" || true)"
+        matches="$(comm -23 <(printf '%s\n' "$matches" | sort) <(printf '%s\n' "$path_lines" | sort) || true)"
+        [[ -z "$matches" ]] && continue
+
         echo -e "${RED}[pre-commit] Possible secret detected in $file${NC}"
         echo -e "  ${YELLOW}Pattern: $label${NC}"
         found=1
