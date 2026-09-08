@@ -20,7 +20,7 @@ jobs:
     name: spellcheck
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: GitHub Spellcheck Action
         uses: rojopolis/spellcheck-github-actions@v0

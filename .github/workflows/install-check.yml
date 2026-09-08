@@ -16,7 +16,7 @@ jobs:
     name: check_secrets_unlocked() behaviour
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # install.sh guards `main "$@"` with BASH_SOURCE[0] == $0, so sourcing
       # it only loads function definitions without executing anything.
@@ -67,7 +67,7 @@ jobs:
     name: --proxy flag behaviour
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: --proxy flag is accepted (exits 0 in help output)
         run: |
