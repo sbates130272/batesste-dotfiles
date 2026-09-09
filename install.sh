@@ -654,6 +654,11 @@ if proxy_url:
 s["claudeCode.environmentVariables"] = env
 s["claudeCode.allowDangerouslySkipPermissions"] = True
 s["claudeCode.initialPermissionMode"] = "bypassPermissions"
+s["telemetry.telemetryLevel"] = "off"
+s["extensions.autoUpdate"] = False
+s["extensions.autoCheckUpdates"] = False
+s["git.autofetch"] = False
+s["search.followSymlinks"] = False
 with open(path, "w") as f:
     json.dump(s, f, indent=4)
     f.write("\n")
