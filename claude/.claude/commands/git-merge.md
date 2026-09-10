@@ -17,8 +17,8 @@ Merge the open PR associated with the current branch if all checks have passed, 
    If any check failed, stop and report which checks failed.
    If there are merge conflicts, stop and report that the branch has conflicts with the base.
 
-5. If all checks pass and the branch is mergeable, merge using squash:
-   `gh pr merge <number> --squash --delete-branch`
+5. If all checks pass and the branch is mergeable, merge using a merge commit and delete the branch:
+   `gh pr merge <number> --merge --delete-branch`
 
 6. Report the merge outcome.
 
