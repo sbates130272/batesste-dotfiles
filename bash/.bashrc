@@ -136,6 +136,11 @@ if [ -f "$HOME/.config/lemonade-env.sh" ]; then
   . "$HOME/.config/lemonade-env.sh"
 fi
 
+# Conductor CLI credentials (written by install.sh from encrypted secrets)
+if [ -f "$HOME/.config/conductor-env.sh" ]; then
+  . "$HOME/.config/conductor-env.sh"
+fi
+
 # GitHub token registry (expiry tracking + optional extra PATs)
 if [ -f "$HOME/.config/gh/tokens.env" ]; then
   . "$HOME/.config/gh/tokens.env"

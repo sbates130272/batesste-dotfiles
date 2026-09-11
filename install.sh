@@ -406,6 +406,8 @@ expand_templates() {
             GRAFANA_HOMELAB_TOKEN
             LEMONADE_API_KEY
             LEMONADE_ADMIN_API_KEY
+            AMD_EMAIL
+            ATS_SECRET
         )
         for var in "${required[@]}"; do
             [[ -z "${!var:-}" ]] && missing+=("$var")
@@ -493,6 +495,10 @@ expand_templates() {
         printf 'export LEMONADE_API_KEY=%s\nexport LEMONADE_ADMIN_API_KEY=%s\n' "$LEMONADE_API_KEY" "$LEMONADE_ADMIN_API_KEY" > "$HOME/.config/lemonade-env.sh"
         chmod 600 "$HOME/.config/lemonade-env.sh"
         log "Expanded lemonade-env.sh"
+
+        printf 'export AMD_EMAIL=%s\nexport ATS_SECRET=%s\n' "$AMD_EMAIL" "$ATS_SECRET" > "$HOME/.config/conductor-env.sh"
+        chmod 600 "$HOME/.config/conductor-env.sh"
+        log "Expanded conductor-env.sh"
 
         generate_claude_settings
         generate_vscode_settings
