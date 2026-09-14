@@ -187,6 +187,11 @@ gh-as() {
   GITHUB_TOKEN="$token" gh "$@"
 }
 
+# Run a git command using the ROCm-scoped PAT.
+# Usage: rocm-git clone https://github.com/ROCm/rocm-systems.git
+rocm-git() {
+  GH_TOKEN="${GH_TOKEN_SBATES130272_ROCM}" git "$@"
+}
 
 export EDITOR=emacs
 if [ -f "$HOME/.config/huggingface-env.sh" ]; then
