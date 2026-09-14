@@ -7,6 +7,8 @@ _DO_FORCE=0
 _DO_PROXY=0
 _DATESTAMP=""
 _OLD_ROOT=""
+_CA_BUNDLE_SRC="${ZSCALER_CA_BUNDLE_SRC:-/etc/ssl/certs/ca-certificates.crt}"
+_BUILDX_BUILDER_NAME="${BUILDX_BUILDER_NAME:-global-corporate-builder}"
 _STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles"
 _STATE_FILE="$_STATE_DIR/install-state"
 
@@ -272,13 +274,17 @@ stow_package() {
 
 
 usage() {
-    echo "Usage: $0 [--proxy] [--force] [packages...]"
+    echo "Usage: $0 [--proxy] [--force] [--ca-bundle <path>] [packages...]"
     echo ""
     echo "Options:"
     echo "  --proxy       Add HTTP_PROXY/HTTPS_PROXY env vars to the generated"
     echo "                ~/.claude/settings.local.json and VS Code Machine settings."
     echo "                Use on machines that reach llm-api.amd.com via a local tunnel"
     echo "                on localhost:8888. Default is no proxy (direct AMD network access)."
+    echo "                Also injects Docker client proxy defaults into ~/.docker/config.json."
+    echo "  --ca-bundle   Source CA bundle path copied to ~/.docker/certs/ca-certificates.crt"
+    echo "                before generating ~/.docker/buildkitd.toml (default:"
+    echo "                /etc/ssl/certs/ca-certificates.crt)."
     echo "  --force       Back up conflicting files before stowing (backup extension: .YYYYMMDD_HHMMSS),"
     echo "                and take over symlinks left behind by another checkout of this repo."
     echo ""
@@ -286,6 +292,10 @@ usage() {
     echo "listed and the install aborts unless --force is given. The version actually"
     echo "being installed is compared against the last recorded install, and a"
     echo "downgrade is reported loudly before anything is changed."
+    echo ""
+    echo "Environment overrides:"
+    echo "  ZSCALER_CA_BUNDLE_SRC   Default value for --ca-bundle."
+    echo "  BUILDX_BUILDER_NAME     Docker buildx builder name (default: global-corporate-builder)."
     echo ""
     echo "Available packages:"
     for d in "$DOTFILES_DIR"/*/; do
@@ -312,6 +322,13 @@ main() {
         local arg="${argv[$i]}"
         if [[ "$arg" == "--proxy" ]]; then
             _DO_PROXY=1
+        elif [[ "$arg" == "--ca-bundle" ]]; then
+            if [[ $((i + 1)) -ge ${#argv[@]} ]]; then
+                echo "ERROR: --ca-bundle requires a path argument" >&2
+                exit 1
+            fi
+            i=$((i + 1))
+            _CA_BUNDLE_SRC="${argv[$i]}"
         elif [[ "$arg" == "--force" ]]; then
             _DO_FORCE=1
             _DATESTAMP="$(date +%Y%m%d_%H%M%S)"
@@ -351,6 +368,7 @@ main() {
 
     if [[ "$full_install" -eq 1 ]]; then
         expand_templates
+        bootstrap_buildx_builder
         install_git_hooks
     fi
     record_install
@@ -458,8 +476,36 @@ expand_templates() {
 
         install -d "$HOME/.docker"
         envsubst < "$tmpl_dir/docker-config.json" > "$HOME/.docker/config.json"
+        if [[ "$_DO_PROXY" -eq 1 ]]; then
+            local docker_cfg_tmp="$HOME/.docker/.config.json.tmp"
+            jq '. + {
+                    proxies: {
+                        default: {
+                            httpProxy: "http://127.0.0.1:8888",
+                            httpsProxy: "http://127.0.0.1:8888",
+                            noProxy: "localhost,127.0.0.1"
+                        }
+                    }
+                }' "$HOME/.docker/config.json" > "$docker_cfg_tmp"
+            mv "$docker_cfg_tmp" "$HOME/.docker/config.json"
+            log "Injected Docker proxy defaults into ~/.docker/config.json (--proxy)"
+        fi
         chmod 600 "$HOME/.docker/config.json"
         log "Expanded docker/config.json"
+
+        install -d "$HOME/.docker/certs"
+        if [[ -f "$_CA_BUNDLE_SRC" ]]; then
+            cp "$_CA_BUNDLE_SRC" "$HOME/.docker/certs/ca-certificates.crt"
+            chmod 644 "$HOME/.docker/certs/ca-certificates.crt"
+            log "Copied CA bundle to ~/.docker/certs/ca-certificates.crt"
+        else
+            echo "[dotfiles] WARNING: CA bundle source not found: $_CA_BUNDLE_SRC" >&2
+            echo "           Skipping ~/.docker/certs/ca-certificates.crt copy." >&2
+        fi
+
+        envsubst < "$tmpl_dir/buildkitd.toml" > "$HOME/.docker/buildkitd.toml"
+        chmod 600 "$HOME/.docker/buildkitd.toml"
+        log "Generated ~/.docker/buildkitd.toml"
 
         install -d "$HOME/.aws"
         envsubst < "$tmpl_dir/aws-credentials" > "$HOME/.aws/credentials"
@@ -552,6 +598,43 @@ PYEOF
         log "Pre-approved API key in $claude_json"
     )
     install_amd_skills
+}
+
+bootstrap_buildx_builder() {
+    local config="$HOME/.docker/buildkitd.toml"
+
+    if ! command -v docker &>/dev/null; then
+        echo "[dotfiles] WARNING: docker not found; skipping buildx bootstrap." >&2
+        return 0
+    fi
+    if ! docker buildx version &>/dev/null; then
+        echo "[dotfiles] WARNING: docker buildx not available; skipping buildx bootstrap." >&2
+        return 0
+    fi
+    if [[ ! -f "$config" ]]; then
+        echo "[dotfiles] WARNING: $config not found; skipping buildx bootstrap." >&2
+        return 0
+    fi
+
+    if docker buildx inspect "$_BUILDX_BUILDER_NAME" &>/dev/null; then
+        if ! docker buildx use "$_BUILDX_BUILDER_NAME" &>/dev/null; then
+            echo "[dotfiles] WARNING: failed to select buildx builder $_BUILDX_BUILDER_NAME." >&2
+            return 0
+        fi
+        log "Using Docker buildx builder $_BUILDX_BUILDER_NAME"
+    else
+        if ! docker buildx create --name "$_BUILDX_BUILDER_NAME" --config "$config" --use &>/dev/null; then
+            echo "[dotfiles] WARNING: failed to create buildx builder $_BUILDX_BUILDER_NAME with $config." >&2
+            return 0
+        fi
+        log "Created Docker buildx builder $_BUILDX_BUILDER_NAME"
+    fi
+
+    if ! docker buildx inspect --bootstrap &>/dev/null; then
+        echo "[dotfiles] WARNING: failed to bootstrap buildx builder $_BUILDX_BUILDER_NAME." >&2
+        return 0
+    fi
+    log "Bootstrapped Docker buildx builder $_BUILDX_BUILDER_NAME"
 }
 
 install_git_hooks() {

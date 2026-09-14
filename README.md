@@ -64,6 +64,38 @@ A full install (no package arguments) also generates `~/.claude/settings.local.j
 ./install.sh --proxy   # SSH-tunnel machines (adds HTTP_PROXY vars)
 ```
 
+### Docker + Zscaler
+
+`install.sh` now configures Docker for Zscaler globally during full installs:
+
+- Copies a CA bundle to `~/.docker/certs/ca-certificates.crt` (default source: `/etc/ssl/certs/ca-certificates.crt`)
+- Generates `~/.docker/buildkitd.toml` from `templates/buildkitd.toml`
+- Attempts to create/use a buildx builder (`global-corporate-builder` by default) using that config
+
+Use direct Zscaler/system-proxy mode (recommended) by default:
+
+```bash
+./install.sh
+```
+
+Use tunnel/proxy mode when the machine must route via localhost proxy:
+
+```bash
+./install.sh --proxy
+```
+
+Optional overrides:
+
+- `--ca-bundle <path>` (or `ZSCALER_CA_BUNDLE_SRC`) to change the source bundle copied into `~/.docker/certs/`
+- `BUILDX_BUILDER_NAME` to override the buildx builder name
+
+Verify Docker buildx setup:
+
+```bash
+docker buildx ls
+docker buildx inspect --bootstrap
+```
+
 Install specific packages only:
 
 ```bash

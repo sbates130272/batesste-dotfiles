@@ -1,0 +1,8 @@
+[workeroci]
+  gcloud = false
+
+[[workerocimounts]]
+  source = "${HOME}/.docker/certs/ca-certificates.crt"
+  destination = "/etc/ssl/certs/ca-certificates.crt"
+  type = "bind"
+  options = ["ro", "rbind"]
