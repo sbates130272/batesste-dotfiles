@@ -5,6 +5,7 @@ vendored
 ROCm
 WSL
 ZScaler
+Zscaler
 Anthropic
 dotfiles
 stow
@@ -38,3 +39,6 @@ natively
 GH
 github
 uppercased
+buildx
+config
+localhost

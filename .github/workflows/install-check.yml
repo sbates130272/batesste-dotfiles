@@ -100,3 +100,34 @@ jobs:
           { ( main --help ); rc=$?; } || true
           [ "$rc" -eq 0 ] && echo "OK: exited 0" || { echo "ERROR: --help should exit 0"; exit 1; }
           EOF
+
+      - name: --ca-bundle sets custom source path
+        run: |
+          bash <<'EOF'
+          DOTFILES_DIR="$PWD"
+          source install.sh
+          check_deps() { :; }
+          check_secrets_unlocked() { :; }
+          init_submodules() { :; }
+          check_relocation() { :; }
+          version_check() { :; }
+          stow_package() { :; }
+          expand_templates() { :; }
+          bootstrap_buildx_builder() { :; }
+          install_git_hooks() { :; }
+          record_install() { :; }
+          post_install_reminders() { :; }
+          main --ca-bundle /tmp/zscaler-custom.crt
+          [ "$_CA_BUNDLE_SRC" = "/tmp/zscaler-custom.crt" ] && echo "OK: _CA_BUNDLE_SRC set" || { echo "ERROR: _CA_BUNDLE_SRC not set correctly"; exit 1; }
+          EOF
+
+      - name: --ca-bundle without value is rejected
+        run: |
+          bash <<'EOF'
+          DOTFILES_DIR="$PWD"
+          source install.sh
+          check_deps() { :; }
+          check_secrets_unlocked() { :; }
+          { ( main --ca-bundle ); rc=$?; } || true
+          [ "$rc" -ne 0 ] && echo "OK: exited non-zero as expected" || { echo "ERROR: should have exited non-zero"; exit 1; }
+          EOF

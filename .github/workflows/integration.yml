@@ -148,11 +148,13 @@ jobs:
           }
           check_file "$HOME/.config/gh/hosts.yml"
           check_file "$HOME/.docker/config.json"
+          check_file "$HOME/.docker/buildkitd.toml"
+          check_file "$HOME/.docker/certs/ca-certificates.crt"
           check_file "$HOME/.aws/credentials"
           check_file "$HOME/.cache/huggingface/token"
           check_file "$HOME/.config/openrouter-env.sh"
           # Expanded files must not contain un-substituted placeholders
-          for f in "$HOME/.config/gh/hosts.yml" "$HOME/.docker/config.json" "$HOME/.aws/credentials"; do
+          for f in "$HOME/.config/gh/hosts.yml" "$HOME/.docker/config.json" "$HOME/.docker/buildkitd.toml" "$HOME/.aws/credentials"; do
             if grep -q '\${' "$f" 2>/dev/null; then
               echo "ERROR: $f still contains un-expanded placeholders"
               failed=1
@@ -176,6 +178,8 @@ jobs:
           }
           check_mode "$HOME/.config/gh/hosts.yml"       600
           check_mode "$HOME/.docker/config.json"        600
+          check_mode "$HOME/.docker/buildkitd.toml"     600
+          check_mode "$HOME/.docker/certs/ca-certificates.crt" 644
           check_mode "$HOME/.aws/credentials"           600
           check_mode "$HOME/.cache/huggingface/token"   600
           check_mode "$HOME/.config/openrouter-env.sh"  600
