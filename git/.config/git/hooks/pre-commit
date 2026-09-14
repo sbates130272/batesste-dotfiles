@@ -14,7 +14,7 @@ declare -A PATTERNS=(
     ["Anthropic API key"]='sk-ant-[a-zA-Z0-9_-]{20,}'
     ["HuggingFace token"]='hf_[a-zA-Z0-9]{20,}'
     ["Docker auth (base64)"]='\"auth\":[[:space:]]*\"[A-Za-z0-9+/]{20,}={0,2}\"'
-    ["GitHub token"]='gh[pousr]_[A-Za-z0-9]{36,}'
+    ["GitHub token"]='gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{20,}'
     ["Generic hex secret (32+ chars)"]='[0-9a-f]{32,}'
     ["Generic high-entropy string"]='[A-Za-z0-9+/]{40,}={0,2}'
 )
