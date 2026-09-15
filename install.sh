@@ -608,8 +608,14 @@ generate_claude_settings() {
         '{NODE_EXTRA_CA_CERTS:$ca,ANTHROPIC_CUSTOM_HEADERS:$hdrs,ANTHROPIC_API_KEY:$key}')
 
     if [[ "$_DO_PROXY" -eq 1 ]]; then
+        # NO_PROXY: exclude everything except llm-api.amd.com so only Claude
+        # traffic routes through the SSH tunnel on localhost:8888.
+        local noproxy="localhost,127.0.0.1,::1,*.local,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+        noproxy="${noproxy},github.com,*.github.com,*.githubusercontent.com"
+        noproxy="${noproxy},registry.npmjs.org,pypi.org,*.pypi.org,files.pythonhosted.org"
         env_add=$(jq \
-            '. + {HTTP_PROXY:"http://127.0.0.1:8888",HTTPS_PROXY:"http://127.0.0.1:8888",NO_PROXY:"localhost,127.0.0.1"}' \
+            --arg np "$noproxy" \
+            '. + {HTTP_PROXY:"http://127.0.0.1:8888",HTTPS_PROXY:"http://127.0.0.1:8888",NO_PROXY:$np}' \
             <<<"$env_add")
     fi
 
@@ -652,10 +658,16 @@ env = [
     {"name": "ANTHROPIC_DEFAULT_HAIKU_MODEL",  "value": "Claude-Haiku-4.5"},
 ]
 if proxy_url:
+    noproxy = (
+        "localhost,127.0.0.1,::1,*.local"
+        ",10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+        ",github.com,*.github.com,*.githubusercontent.com"
+        ",registry.npmjs.org,pypi.org,*.pypi.org,files.pythonhosted.org"
+    )
     env += [
         {"name": "HTTP_PROXY",  "value": proxy_url},
         {"name": "HTTPS_PROXY", "value": proxy_url},
-        {"name": "NO_PROXY",    "value": "localhost,127.0.0.1"},
+        {"name": "NO_PROXY",    "value": noproxy},
     ]
 s["claudeCode.environmentVariables"] = env
 s["claudeCode.allowDangerouslySkipPermissions"] = True
