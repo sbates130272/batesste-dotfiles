@@ -445,6 +445,9 @@ expand_templates() {
                 echo "export GH_TOKEN_SBATES130272_ROCM='${GH_TOKEN_SBATES130272_ROCM}'"
                 [[ -n "${GH_TOKEN_SBATES130272_ROCM_EXPIRES:-}" ]] && \
                     echo "export GH_TOKEN_SBATES130272_ROCM_EXPIRES='${GH_TOKEN_SBATES130272_ROCM_EXPIRES}'"
+                echo ""
+                echo "# Fine-grained PAT exported as GITHUB_TOKEN so gh(1) picks it up automatically."
+                echo "export GITHUB_TOKEN='${GH_TOKEN_SBATES130272_ROCM}'"
             }
         } > "$HOME/.config/gh/tokens.env"
         chmod 600 "$HOME/.config/gh/tokens.env"

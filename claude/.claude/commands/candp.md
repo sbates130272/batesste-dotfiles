@@ -6,11 +6,14 @@ The user has committed changes and pushed to a remote-tracked branch. Monitor th
    If there is no upstream tracking branch, stop and report the branch has no remote tracking ref.
 
 2. Determine which GitHub account to use:
-   - Get the remote URL: `git remote get-url origin`
-   - If the remote URL contains `ROCm`, `ROCmSoftwarePlatform`, or `amd-staging`, use account `stebates_amdeng`.
-   - Otherwise use account `sbates130272`.
-   - Switch to the selected account: `gh auth switch -u <account>`
-   - Confirm the switch: `gh auth status`
+   - Check if `GITHUB_TOKEN` is set: `printenv GITHUB_TOKEN | head -c 4` (just check presence, never print the value).
+   - If `GITHUB_TOKEN` is set, `gh` will use it automatically — skip account switching and report "using GITHUB_TOKEN".
+   - If `GITHUB_TOKEN` is not set:
+     - Get the remote URL: `git remote get-url origin`
+     - If the remote URL contains `ROCm`, `ROCmSoftwarePlatform`, or `amd-staging`, use account `stebates_amdeng`.
+     - Otherwise use account `sbates130272`.
+     - Switch to the selected account: `gh auth switch -u <account>`
+     - Confirm the switch: `gh auth status`
 
 3. Find the open PR for this branch:
    `gh pr list --head <branch> --state open --json number,title,url,statusCheckRollup`
