@@ -30,3 +30,19 @@
 - Default account is `sbates130272` — verify with `gh auth status` if switching accounts; never assume another account is active
 - Always act as `sbates130272` (e.g. opening issues, commenting, creating PRs) unless the user explicitly directs otherwise
 - Prefer `gh` over direct API calls or web URLs for any GitHub state queries
+
+## GitHub PATs and the gh tool
+
+Three tokens are in play; pick the right one for the operation:
+
+| Token | Variable | Type | Scope |
+| --- | --- | --- | --- |
+| `GITHUB_TOKEN` (env) | `GH_TOKEN_SBATES130272_ROCM` | Fine-grained PAT | Personal + ROCm/AMD org repos; set automatically at login via `~/.config/gh/tokens.env` |
+| `sbates130272` (hosts.yml) | `GH_TOKEN_SBATES130272` | Classic PAT | Full personal GitHub — org admin, enterprise, GPG keys, etc. |
+| `stebates_amdeng` (hosts.yml) | `GH_TOKEN_STEBATES_AMDENG` | Classic PAT | AMD org — `repo` + `read:org` only |
+
+- `gh` automatically uses `GITHUB_TOKEN` when set — prefer this for day-to-day PR/check work
+- Switch to a named account only when the fine-grained PAT lacks the required scope: `gh auth switch -u <account>`
+- Use `gh-as <TOKEN_NAME> <args>` to run a single command under an alternate token without changing the active account
+- Use `gh-token-check` to see expiry status of all registered tokens
+- For ROCm git operations use `rocm-git <args>` (wraps git with `GH_TOKEN` set to the fine-grained PAT)
