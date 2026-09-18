@@ -17,7 +17,12 @@ Merge the open PR associated with the current branch if all checks have passed, 
    If any check failed, stop and report which checks failed.
    If there are merge conflicts, stop and report that the branch has conflicts with the base.
 
-5. If all checks pass and the branch is mergeable, merge using a merge commit and delete the branch:
+5. If all checks pass and the branch is mergeable, before merging ensure the active `gh` account is
+   the classic `sbates130272` token (hosts.yml), not the fine-grained PAT via `GITHUB_TOKEN`. The
+   fine-grained PAT is an Enterprise Managed User token and will fail with "Unauthorized: EMU cannot
+   access this content" when attempting a merge on personal repos. Switch if needed:
+   `gh auth switch -u sbates130272`
+   Then merge using a merge commit and delete the branch:
    `gh pr merge <number> --merge --delete-branch`
 
 6. Report the merge outcome.
