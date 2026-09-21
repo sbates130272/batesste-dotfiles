@@ -29,6 +29,7 @@ git/           # ~/.gitconfig, ~/.config/git/hooks/pre-commit
 gpg/           # ~/.gnupg/gpg-agent.conf (pinentry and agent settings)
 secrets/       # ~/.secrets.env (git-crypt encrypted)
 ssh/           # ~/.ssh/config
+systemd/       # ~/.config/environment.d/ (user unit environment files)
 ```
 
 Run `./install.sh` from the repo root to stow all packages. Three directories are **not** stow packages and their contents stay in the repo:
