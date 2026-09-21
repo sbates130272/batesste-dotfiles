@@ -478,12 +478,26 @@ expand_templates() {
         envsubst < "$tmpl_dir/docker-config.json" > "$HOME/.docker/config.json"
         if [[ "$_DO_PROXY" -eq 1 ]]; then
             local docker_cfg_tmp="$HOME/.docker/.config.json.tmp"
-            jq '. + {
+            # Docker noProxy does not support CIDR; use hostnames and IPs only.
+            local docker_noproxy="localhost,127.0.0.1,::1"
+            docker_noproxy="${docker_noproxy},github.com,.github.com,raw.githubusercontent.com,api.github.com"
+            docker_noproxy="${docker_noproxy},codeload.github.com,objects.githubusercontent.com"
+            docker_noproxy="${docker_noproxy},registry.npmjs.org,pypi.org,.pypi.org,files.pythonhosted.org"
+            docker_noproxy="${docker_noproxy},crates.io,static.crates.io"
+            docker_noproxy="${docker_noproxy},proxy.golang.org,sum.golang.org,pkg.go.dev"
+            docker_noproxy="${docker_noproxy},conda.anaconda.org,repo.anaconda.com,.anaconda.org"
+            docker_noproxy="${docker_noproxy},docker.io,registry-1.docker.io,auth.docker.io"
+            docker_noproxy="${docker_noproxy},production.cloudflare.docker.com"
+            docker_noproxy="${docker_noproxy},ghcr.io,quay.io,mcr.microsoft.com,registry.k8s.io"
+            docker_noproxy="${docker_noproxy},huggingface.co,.huggingface.co,.hf.co"
+            docker_noproxy="${docker_noproxy},repo.radeon.com,download.amd.com"
+            docker_noproxy="${docker_noproxy},archive.ubuntu.com,security.ubuntu.com,deb.debian.org"
+            jq --arg np "$docker_noproxy" '. + {
                     proxies: {
                         default: {
                             httpProxy: "http://127.0.0.1:8888",
                             httpsProxy: "http://127.0.0.1:8888",
-                            noProxy: "localhost,127.0.0.1"
+                            noProxy: $np
                         }
                     }
                 }' "$HOME/.docker/config.json" > "$docker_cfg_tmp"
