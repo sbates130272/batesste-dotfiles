@@ -9,6 +9,11 @@ if [ -f "$HOME/.config/claude/env.sh" ]; then
   . "$HOME/.config/claude/env.sh"
 fi
 
+# Proxy env (written by install.sh --proxy; absent on direct-network nodes).
+if [ -f "$HOME/.config/proxy-env.sh" ]; then
+  . "$HOME/.config/proxy-env.sh"
+fi
+
 # If not running interactively, don't do anything
 case $- in
     *i*) ;;

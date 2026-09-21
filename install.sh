@@ -503,6 +503,34 @@ expand_templates() {
         chmod 600 "$HOME/.config/conductor-env.sh"
         log "Expanded conductor-env.sh"
 
+        if [[ "$_DO_PROXY" -eq 1 ]]; then
+            local noproxy="localhost,127.0.0.1,::1,*.local,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+            # GitHub — ZScaler CA does not chain to system bundle; go direct.
+            noproxy="${noproxy},github.com,.github.com,raw.githubusercontent.com,api.github.com"
+            noproxy="${noproxy},codeload.github.com,objects.githubusercontent.com"
+            # Package registries
+            noproxy="${noproxy},registry.npmjs.org,pypi.org,.pypi.org,files.pythonhosted.org"
+            noproxy="${noproxy},crates.io,static.crates.io"
+            noproxy="${noproxy},proxy.golang.org,sum.golang.org,pkg.go.dev"
+            noproxy="${noproxy},conda.anaconda.org,repo.anaconda.com,.anaconda.org"
+            # Container registries
+            noproxy="${noproxy},docker.io,registry-1.docker.io,auth.docker.io"
+            noproxy="${noproxy},production.cloudflare.docker.com"
+            noproxy="${noproxy},ghcr.io,quay.io,mcr.microsoft.com,registry.k8s.io"
+            # ML / HuggingFace
+            noproxy="${noproxy},huggingface.co,.huggingface.co,.hf.co"
+            # ROCm / AMD packages
+            noproxy="${noproxy},repo.radeon.com,download.amd.com"
+            # OS package mirrors
+            noproxy="${noproxy},archive.ubuntu.com,security.ubuntu.com,deb.debian.org"
+            printf 'export HTTP_PROXY=http://127.0.0.1:8888\n' > "$HOME/.config/proxy-env.sh"
+            printf 'export HTTPS_PROXY=http://127.0.0.1:8888\n' >> "$HOME/.config/proxy-env.sh"
+            printf 'export no_proxy=%s\n' "$noproxy" >> "$HOME/.config/proxy-env.sh"
+            printf 'export NO_PROXY="$no_proxy"\n' >> "$HOME/.config/proxy-env.sh"
+            chmod 600 "$HOME/.config/proxy-env.sh"
+            log "Expanded proxy-env.sh"
+        fi
+
         generate_claude_settings
         generate_vscode_settings
 
@@ -614,8 +642,18 @@ generate_claude_settings() {
         # NO_PROXY: exclude everything except llm-api.amd.com so only Claude
         # traffic routes through the SSH tunnel on localhost:8888.
         local noproxy="localhost,127.0.0.1,::1,*.local,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
-        noproxy="${noproxy},github.com,*.github.com,*.githubusercontent.com"
-        noproxy="${noproxy},registry.npmjs.org,pypi.org,*.pypi.org,files.pythonhosted.org"
+        noproxy="${noproxy},github.com,.github.com,raw.githubusercontent.com,api.github.com"
+        noproxy="${noproxy},codeload.github.com,objects.githubusercontent.com"
+        noproxy="${noproxy},registry.npmjs.org,pypi.org,.pypi.org,files.pythonhosted.org"
+        noproxy="${noproxy},crates.io,static.crates.io"
+        noproxy="${noproxy},proxy.golang.org,sum.golang.org,pkg.go.dev"
+        noproxy="${noproxy},conda.anaconda.org,repo.anaconda.com,.anaconda.org"
+        noproxy="${noproxy},docker.io,registry-1.docker.io,auth.docker.io"
+        noproxy="${noproxy},production.cloudflare.docker.com"
+        noproxy="${noproxy},ghcr.io,quay.io,mcr.microsoft.com,registry.k8s.io"
+        noproxy="${noproxy},huggingface.co,.huggingface.co,.hf.co"
+        noproxy="${noproxy},repo.radeon.com,download.amd.com"
+        noproxy="${noproxy},archive.ubuntu.com,security.ubuntu.com,deb.debian.org"
         env_add=$(jq \
             --arg np "$noproxy" \
             '. + {HTTP_PROXY:"http://127.0.0.1:8888",HTTPS_PROXY:"http://127.0.0.1:8888",NO_PROXY:$np}' \
@@ -664,8 +702,18 @@ if proxy_url:
     noproxy = (
         "localhost,127.0.0.1,::1,*.local"
         ",10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
-        ",github.com,*.github.com,*.githubusercontent.com"
-        ",registry.npmjs.org,pypi.org,*.pypi.org,files.pythonhosted.org"
+        ",github.com,.github.com,raw.githubusercontent.com,api.github.com"
+        ",codeload.github.com,objects.githubusercontent.com"
+        ",registry.npmjs.org,pypi.org,.pypi.org,files.pythonhosted.org"
+        ",crates.io,static.crates.io"
+        ",proxy.golang.org,sum.golang.org,pkg.go.dev"
+        ",conda.anaconda.org,repo.anaconda.com,.anaconda.org"
+        ",docker.io,registry-1.docker.io,auth.docker.io"
+        ",production.cloudflare.docker.com"
+        ",ghcr.io,quay.io,mcr.microsoft.com,registry.k8s.io"
+        ",huggingface.co,.huggingface.co,.hf.co"
+        ",repo.radeon.com,download.amd.com"
+        ",archive.ubuntu.com,security.ubuntu.com,deb.debian.org"
     )
     env += [
         {"name": "HTTP_PROXY",  "value": proxy_url},
