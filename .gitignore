@@ -18,6 +18,7 @@
 aws/.aws/credentials
 aws/.aws/*.pmem
 gh/.config/gh/hosts.yml
+gh/.config/gh/tokens.env
 
 
 # Claude — session and runtime state (not config).

@@ -95,6 +95,13 @@ for file in "${staged[@]}"; do
         matches="$(comm -23 <(printf '%s\n' "$matches" | sort) <(printf '%s\n' "$sha_lines" | sort) || true)"
         [[ -z "$matches" ]] && continue
 
+        # Discard GPG key fingerprints on signingkey lines. A fingerprint is
+        # 40 hex chars (optionally followed by ! to pin a subkey) and is public
+        # information — it identifies a key, it is not the key itself.
+        gpg_lines="$(git diff --cached -- "$file" | grep -P '^\+[^+]' | grep -P 'signingkey\s*=' | grep -oP "$regex" || true)"
+        matches="$(comm -23 <(printf '%s\n' "$matches" | sort) <(printf '%s\n' "$gpg_lines" | sort) || true)"
+        [[ -z "$matches" ]] && continue
+
         # Discard standalone exactly-40-char lowercase hex strings. These are
         # git SHAs appearing as bare YAML block-scalar values with no key
         # context on the same line.
