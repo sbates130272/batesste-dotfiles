@@ -4,7 +4,7 @@
 [user]
 	name = Stephen Bates
 	email = sbates@raithlin.com
-	signingkey = CB05CB5CFA5DFD9850BB814DE0C020C1975548AE
+	signingkey = 2E06EA0F9D7B3EC9930C2DAAC04A6C77619F802A!
 [commit]
 	gpgsign = true
 [pull]
