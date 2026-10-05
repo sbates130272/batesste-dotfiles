@@ -277,11 +277,11 @@ usage() {
     echo "Usage: $0 [--proxy] [--force] [--ca-bundle <path>] [packages...]"
     echo ""
     echo "Options:"
-    echo "  --proxy       Add HTTP_PROXY/HTTPS_PROXY env vars to the generated"
-    echo "                ~/.claude/settings.local.json and VS Code Machine settings."
-    echo "                Use on machines that reach llm-api.amd.com via a local tunnel"
-    echo "                on localhost:8888. Default is no proxy (direct AMD network access)."
-    echo "                Also injects Docker client proxy defaults into ~/.docker/config.json."
+    echo "  --proxy       Route Claude traffic through the local SSH tunnel on"
+    echo "                localhost:8888. Sets HTTP_PROXY/HTTPS_PROXY only inside"
+    echo "                ~/.claude/settings.local.json and VS Code claudeCode.environmentVariables"
+    echo "                so non-Claude tools (curl, apt, Docker, etc.) go direct."
+    echo "                Use on machines where llm-api.amd.com is reachable only via tunnel."
     echo "  --ca-bundle   Source CA bundle path copied to ~/.docker/certs/ca-certificates.crt"
     echo "                before generating ~/.docker/buildkitd.toml (default:"
     echo "                /etc/ssl/certs/ca-certificates.crt)."
@@ -476,34 +476,6 @@ expand_templates() {
 
         install -d "$HOME/.docker"
         envsubst < "$tmpl_dir/docker-config.json" > "$HOME/.docker/config.json"
-        if [[ "$_DO_PROXY" -eq 1 ]]; then
-            local docker_cfg_tmp="$HOME/.docker/.config.json.tmp"
-            # Docker noProxy does not support CIDR; use hostnames and IPs only.
-            local docker_noproxy="localhost,127.0.0.1,::1"
-            docker_noproxy="${docker_noproxy},github.com,.github.com,raw.githubusercontent.com,api.github.com"
-            docker_noproxy="${docker_noproxy},codeload.github.com,objects.githubusercontent.com"
-            docker_noproxy="${docker_noproxy},registry.npmjs.org,pypi.org,.pypi.org,files.pythonhosted.org"
-            docker_noproxy="${docker_noproxy},crates.io,static.crates.io"
-            docker_noproxy="${docker_noproxy},proxy.golang.org,sum.golang.org,pkg.go.dev"
-            docker_noproxy="${docker_noproxy},conda.anaconda.org,repo.anaconda.com,.anaconda.org"
-            docker_noproxy="${docker_noproxy},docker.io,registry-1.docker.io,auth.docker.io"
-            docker_noproxy="${docker_noproxy},production.cloudflare.docker.com"
-            docker_noproxy="${docker_noproxy},ghcr.io,quay.io,mcr.microsoft.com,registry.k8s.io"
-            docker_noproxy="${docker_noproxy},huggingface.co,.huggingface.co,.hf.co"
-            docker_noproxy="${docker_noproxy},repo.radeon.com,download.amd.com"
-            docker_noproxy="${docker_noproxy},archive.ubuntu.com,security.ubuntu.com,deb.debian.org"
-            jq --arg np "$docker_noproxy" '. + {
-                    proxies: {
-                        default: {
-                            httpProxy: "http://127.0.0.1:8888",
-                            httpsProxy: "http://127.0.0.1:8888",
-                            noProxy: $np
-                        }
-                    }
-                }' "$HOME/.docker/config.json" > "$docker_cfg_tmp"
-            mv "$docker_cfg_tmp" "$HOME/.docker/config.json"
-            log "Injected Docker proxy defaults into ~/.docker/config.json (--proxy)"
-        fi
         chmod 600 "$HOME/.docker/config.json"
         log "Expanded docker/config.json"
 
@@ -563,33 +535,12 @@ expand_templates() {
         chmod 600 "$HOME/.config/conductor-env.sh"
         log "Expanded conductor-env.sh"
 
-        if [[ "$_DO_PROXY" -eq 1 ]]; then
-            local noproxy="localhost,127.0.0.1,::1,*.local,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
-            # GitHub — ZScaler CA does not chain to system bundle; go direct.
-            noproxy="${noproxy},github.com,.github.com,raw.githubusercontent.com,api.github.com"
-            noproxy="${noproxy},codeload.github.com,objects.githubusercontent.com"
-            # Package registries
-            noproxy="${noproxy},registry.npmjs.org,pypi.org,.pypi.org,files.pythonhosted.org"
-            noproxy="${noproxy},crates.io,static.crates.io"
-            noproxy="${noproxy},proxy.golang.org,sum.golang.org,pkg.go.dev"
-            noproxy="${noproxy},conda.anaconda.org,repo.anaconda.com,.anaconda.org"
-            # Container registries
-            noproxy="${noproxy},docker.io,registry-1.docker.io,auth.docker.io"
-            noproxy="${noproxy},production.cloudflare.docker.com"
-            noproxy="${noproxy},ghcr.io,quay.io,mcr.microsoft.com,registry.k8s.io"
-            # ML / HuggingFace
-            noproxy="${noproxy},huggingface.co,.huggingface.co,.hf.co"
-            # ROCm / AMD packages
-            noproxy="${noproxy},repo.radeon.com,download.amd.com"
-            # OS package mirrors
-            noproxy="${noproxy},archive.ubuntu.com,security.ubuntu.com,deb.debian.org"
-            printf 'export HTTP_PROXY=http://127.0.0.1:8888\n' > "$HOME/.config/proxy-env.sh"
-            printf 'export HTTPS_PROXY=http://127.0.0.1:8888\n' >> "$HOME/.config/proxy-env.sh"
-            printf 'export no_proxy=%s\n' "$noproxy" >> "$HOME/.config/proxy-env.sh"
-            printf 'export NO_PROXY="$no_proxy"\n' >> "$HOME/.config/proxy-env.sh"
-            chmod 600 "$HOME/.config/proxy-env.sh"
-            log "Expanded proxy-env.sh"
-        fi
+        # proxy-env.sh used to set HTTP_PROXY/HTTPS_PROXY globally in the shell,
+        # routing all traffic through the localhost:8888 SSH tunnel. That broke
+        # non-Claude tools (curl, apt, pip, etc.). Proxy is now scoped to Claude
+        # only via settings.local.json and VSCode claudeCode.environmentVariables.
+        # Remove any leftover file from a prior install.
+        rm -f "$HOME/.config/proxy-env.sh"
 
         generate_claude_settings
         generate_vscode_settings
