@@ -1,0 +1,129 @@
+name: Token check
+
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly on Monday at 08:00 UTC
+    - cron: "0 8 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: token-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  token-check:
+    name: GitHub PAT reachability
+    runs-on: ubuntu-24.04
+    env:
+      PERSONAL_REPO: sbates130272/batesste-dotfiles
+      ROCM_REPO: ROCm/rocm-systems
+    steps:
+      - name: Install gh CLI
+        run: |
+          type gh >/dev/null 2>&1 && exit 0
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+            | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] \
+            https://cli.github.com/packages stable main" \
+            | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+          sudo apt-get update && sudo apt-get install -y gh
+
+      # ── GH_TOKEN_SBATES130272_ROCM (fine-grained PAT) ──────────────────────
+      # Expected: personal repo + ROCm org repo
+      - name: SBATES130272_ROCM → personal repo
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN_SBATES130272_ROCM }}
+        run: |
+          if [[ -z "$GH_TOKEN" ]]; then
+            echo "SKIP: secret GH_TOKEN_SBATES130272_ROCM not configured"
+            exit 0
+          fi
+          echo "Testing GH_TOKEN_SBATES130272_ROCM against $PERSONAL_REPO ..."
+          gh repo view "$PERSONAL_REPO" --json nameWithOwner,visibility
+          echo "OK"
+
+      - name: SBATES130272_ROCM → ROCm repo
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN_SBATES130272_ROCM }}
+        run: |
+          if [[ -z "$GH_TOKEN" ]]; then
+            echo "SKIP: secret GH_TOKEN_SBATES130272_ROCM not configured"
+            exit 0
+          fi
+          echo "Testing GH_TOKEN_SBATES130272_ROCM against $ROCM_REPO ..."
+          gh repo view "$ROCM_REPO" --json nameWithOwner,visibility
+          echo "OK"
+
+      # ── GH_TOKEN_STEBATES_AMDENG (AMD org classic PAT) ────────────────────
+      # Expected: ROCm org repo; personal repo works because it is public
+      - name: STEBATES_AMDENG → ROCm repo
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN_STEBATES_AMDENG }}
+        run: |
+          if [[ -z "$GH_TOKEN" ]]; then
+            echo "SKIP: secret GH_TOKEN_STEBATES_AMDENG not configured"
+            exit 0
+          fi
+          echo "Testing GH_TOKEN_STEBATES_AMDENG against $ROCM_REPO ..."
+          gh repo view "$ROCM_REPO" --json nameWithOwner,visibility
+          echo "OK"
+
+      - name: STEBATES_AMDENG → personal repo
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN_STEBATES_AMDENG }}
+        run: |
+          if [[ -z "$GH_TOKEN" ]]; then
+            echo "SKIP: secret GH_TOKEN_STEBATES_AMDENG not configured"
+            exit 0
+          fi
+          echo "Testing GH_TOKEN_STEBATES_AMDENG against $PERSONAL_REPO ..."
+          gh repo view "$PERSONAL_REPO" --json nameWithOwner,visibility
+          echo "OK"
+
+      # ── GH_TOKEN_SBATES130272 (classic personal PAT) ──────────────────────
+      # Expected: personal repo + org admin operations
+      - name: SBATES130272 → personal repo
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN_SBATES130272 }}
+        run: |
+          if [[ -z "$GH_TOKEN" ]]; then
+            echo "SKIP: secret GH_TOKEN_SBATES130272 not configured"
+            exit 0
+          fi
+          echo "Testing GH_TOKEN_SBATES130272 against $PERSONAL_REPO ..."
+          gh repo view "$PERSONAL_REPO" --json nameWithOwner,visibility
+          echo "OK"
+
+      # ── Token expiry (from registered _EXPIRES secrets) ───────────────────
+      - name: Check token expiry dates
+        env:
+          SBATES130272_ROCM_EXPIRES: ${{ secrets.GH_TOKEN_SBATES130272_ROCM_EXPIRES }}
+          STEBATES_AMDENG_EXPIRES: ${{ secrets.GH_TOKEN_STEBATES_AMDENG_EXPIRES }}
+          SBATES130272_EXPIRES: ${{ secrets.GH_TOKEN_SBATES130272_EXPIRES }}
+        run: |
+          today=$(date +%s)
+          warn_days=14
+          failed=0
+
+          check_expiry() {
+            local name="$1" expiry="$2"
+            [[ -z "$expiry" ]] && { echo "SKIP: no expiry registered for $name"; return; }
+            local exp_ts days_left
+            exp_ts=$(date -d "$expiry" +%s 2>/dev/null) || { echo "WARN: cannot parse expiry '$expiry' for $name"; return; }
+            days_left=$(( (exp_ts - today) / 86400 ))
+            if   [[ $days_left -le 0 ]];          then echo "EXPIRED  $name (expired $expiry)"; failed=1
+            elif [[ $days_left -le $warn_days ]];  then echo "WARNING  $name expires in ${days_left}d ($expiry)"; failed=1
+            else                                        echo "OK       $name expires in ${days_left}d ($expiry)"
+            fi
+          }
+
+          check_expiry GH_TOKEN_SBATES130272_ROCM  "$SBATES130272_ROCM_EXPIRES"
+          check_expiry GH_TOKEN_STEBATES_AMDENG    "$STEBATES_AMDENG_EXPIRES"
+          check_expiry GH_TOKEN_SBATES130272        "$SBATES130272_EXPIRES"
+
+          exit $failed
