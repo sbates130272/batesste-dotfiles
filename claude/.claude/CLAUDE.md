@@ -37,7 +37,7 @@ Three tokens are in play; pick the right one for the operation:
 
 | Token | Variable | Type | Scope |
 | --- | --- | --- | --- |
-| `GITHUB_TOKEN` (env) | `GH_TOKEN_SBATES130272_ROCM` | Fine-grained PAT | Personal + ROCm/AMD org repos; set automatically at login via `~/.config/gh/tokens.env` |
+| `GITHUB_TOKEN` (env) | `GH_TOKEN_SBATES130272` | Classic PAT | Full personal GitHub — set automatically at login via `~/.config/gh/tokens.env` |
 | `sbates130272` (hosts.yml) | `GH_TOKEN_SBATES130272` | Classic PAT | Full personal GitHub — org admin, enterprise, GPG keys, etc. |
 | `stebates_amdeng` (hosts.yml) | `GH_TOKEN_STEBATES_AMDENG` | Classic PAT | AMD org — `repo` + `read:org` only |
 
