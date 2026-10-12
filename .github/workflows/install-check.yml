@@ -69,18 +69,51 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: --proxy flag is accepted (exits 0 in help output)
+      - name: --proxy sets default URL when no URL given
         run: |
           bash <<'EOF'
           DOTFILES_DIR="$PWD"
           source install.sh
-          # Verify _DO_PROXY is set by --proxy without running a full install.
-          _DO_PROXY=0
+          # Simulate arg parsing for --proxy with no URL.
+          _PROXY_URL=""
           argv=(--proxy)
-          for arg in "${argv[@]}"; do
-            [ "$arg" = "--proxy" ] && _DO_PROXY=1
+          i=0
+          while [[ $i -lt ${#argv[@]} ]]; do
+            arg="${argv[$i]}"
+            if [[ "$arg" == "--proxy" ]]; then
+              if [[ $((i + 1)) -lt ${#argv[@]} && "${argv[$((i + 1))]}" == http* ]]; then
+                i=$((i + 1)); _PROXY_URL="${argv[$i]}"
+              else
+                _PROXY_URL="http://127.0.0.1:8888"
+              fi
+            fi
+            i=$((i + 1))
           done
-          [ "$_DO_PROXY" -eq 1 ] && echo "OK: _DO_PROXY set" || { echo "ERROR: _DO_PROXY not set"; exit 1; }
+          [ "$_PROXY_URL" = "http://127.0.0.1:8888" ] && echo "OK: default proxy URL set" \
+            || { echo "ERROR: got '$_PROXY_URL'"; exit 1; }
+          EOF
+
+      - name: --proxy accepts explicit URL
+        run: |
+          bash <<'EOF'
+          DOTFILES_DIR="$PWD"
+          source install.sh
+          _PROXY_URL=""
+          argv=(--proxy http://10.0.0.107:8888)
+          i=0
+          while [[ $i -lt ${#argv[@]} ]]; do
+            arg="${argv[$i]}"
+            if [[ "$arg" == "--proxy" ]]; then
+              if [[ $((i + 1)) -lt ${#argv[@]} && "${argv[$((i + 1))]}" == http* ]]; then
+                i=$((i + 1)); _PROXY_URL="${argv[$i]}"
+              else
+                _PROXY_URL="http://127.0.0.1:8888"
+              fi
+            fi
+            i=$((i + 1))
+          done
+          [ "$_PROXY_URL" = "http://10.0.0.107:8888" ] && echo "OK: explicit proxy URL set" \
+            || { echo "ERROR: got '$_PROXY_URL'"; exit 1; }
           EOF
 
       - name: unknown flags are rejected
