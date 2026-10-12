@@ -8,7 +8,8 @@ _PROXY_URL=""
 _DATESTAMP=""
 _OLD_ROOT=""
 _CA_BUNDLE_SRC="${ZSCALER_CA_BUNDLE_SRC:-/etc/ssl/certs/ca-certificates.crt}"
-_BUILDX_BUILDER_NAME="${BUILDX_BUILDER_NAME:-global-corporate-builder}"
+_BUILDX_BUILDER_NAME="${BUILDX_BUILDER_NAME:-amd-moby-buildkit}"
+_BUILDX_NODES=("APCAN-MQ60818VV")
 _STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles"
 _STATE_FILE="$_STATE_DIR/install-state"
 
@@ -19,6 +20,12 @@ _STATE_FILE="$_STATE_DIR/install-state"
 _NON_PACKAGES=(templates scripts vendor)
 
 log() { echo "[dotfiles] $*"; }
+
+is_buildx_node() {
+    local h; h="$(hostname)"
+    local n; for n in "${_BUILDX_NODES[@]}"; do [[ "$h" == "$n" ]] && return 0; done
+    return 1
+}
 
 is_package() {
     local candidate="$1" np
@@ -296,7 +303,8 @@ usage() {
     echo ""
     echo "Environment overrides:"
     echo "  ZSCALER_CA_BUNDLE_SRC   Default value for --ca-bundle."
-    echo "  BUILDX_BUILDER_NAME     Docker buildx builder name (default: global-corporate-builder)."
+    echo "  BUILDX_BUILDER_NAME     Docker buildx builder name (default: amd-moby-buildkit).
+                          Docker buildkit setup only runs on nodes in _BUILDX_NODES."
     echo ""
     echo "Available packages:"
     for d in "$DOTFILES_DIR"/*/; do
@@ -478,27 +486,31 @@ expand_templates() {
         chmod 600 "$HOME/.config/gh/tokens.env"
         log "Expanded gh/tokens.env"
 
-        DOCKER_AUTH=$(printf '%s:%s' "$DOCKER_USERNAME" "$DOCKER_PAT" | base64 -w 0)
-        export DOCKER_AUTH
+        if is_buildx_node; then
+            DOCKER_AUTH=$(printf '%s:%s' "$DOCKER_USERNAME" "$DOCKER_PAT" | base64 -w 0)
+            export DOCKER_AUTH
 
-        install -d "$HOME/.docker"
-        envsubst < "$tmpl_dir/docker-config.json" > "$HOME/.docker/config.json"
-        chmod 600 "$HOME/.docker/config.json"
-        log "Expanded docker/config.json"
+            install -d "$HOME/.docker"
+            envsubst < "$tmpl_dir/docker-config.json" > "$HOME/.docker/config.json"
+            chmod 600 "$HOME/.docker/config.json"
+            log "Expanded docker/config.json"
 
-        install -d "$HOME/.docker/certs"
-        if [[ -f "$_CA_BUNDLE_SRC" ]]; then
-            cp "$_CA_BUNDLE_SRC" "$HOME/.docker/certs/ca-certificates.crt"
-            chmod 644 "$HOME/.docker/certs/ca-certificates.crt"
-            log "Copied CA bundle to ~/.docker/certs/ca-certificates.crt"
+            install -d "$HOME/.docker/certs"
+            if [[ -f "$_CA_BUNDLE_SRC" ]]; then
+                cp "$_CA_BUNDLE_SRC" "$HOME/.docker/certs/ca-certificates.crt"
+                chmod 644 "$HOME/.docker/certs/ca-certificates.crt"
+                log "Copied CA bundle to ~/.docker/certs/ca-certificates.crt"
+            else
+                echo "[dotfiles] WARNING: CA bundle source not found: $_CA_BUNDLE_SRC" >&2
+                echo "           Skipping ~/.docker/certs/ca-certificates.crt copy." >&2
+            fi
+
+            envsubst < "$tmpl_dir/buildkitd.toml" > "$HOME/.docker/buildkitd.toml"
+            chmod 600 "$HOME/.docker/buildkitd.toml"
+            log "Generated ~/.docker/buildkitd.toml"
         else
-            echo "[dotfiles] WARNING: CA bundle source not found: $_CA_BUNDLE_SRC" >&2
-            echo "           Skipping ~/.docker/certs/ca-certificates.crt copy." >&2
+            log "Skipping Docker buildkit config (not a buildx node)"
         fi
-
-        envsubst < "$tmpl_dir/buildkitd.toml" > "$HOME/.docker/buildkitd.toml"
-        chmod 600 "$HOME/.docker/buildkitd.toml"
-        log "Generated ~/.docker/buildkitd.toml"
 
         install -d "$HOME/.aws"
         envsubst < "$tmpl_dir/aws-credentials" > "$HOME/.aws/credentials"
@@ -573,6 +585,11 @@ PYEOF
 }
 
 bootstrap_buildx_builder() {
+    if ! is_buildx_node; then
+        log "Skipping buildx bootstrap (not a buildx node)"
+        return 0
+    fi
+
     local config="$HOME/.docker/buildkitd.toml"
 
     if ! command -v docker &>/dev/null; then
