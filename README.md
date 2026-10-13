@@ -57,12 +57,15 @@ git-crypt unlock    # requires your GPG private key
 ./install.sh
 ```
 
-A full install (no package arguments) also generates `~/.claude/settings.local.json` from `templates/claude-settings-local.json`, writes the VS Code Machine settings, and installs the [AMD skills](https://github.com/amd/skills) into `~/.claude/skills/`. Pass `--proxy` on machines that reach the AMD API gateway via an SSH reverse tunnel on `localhost:8888`; omit it on machines with direct AMD network access (e.g. WSL2 behind ZScaler):
+A full install (no package arguments) also generates `~/.claude/settings.local.json` from `templates/claude-settings-local.json`, writes the VS Code Machine settings, and installs the [AMD skills](https://github.com/amd/skills) into `~/.claude/skills/`. On machines without direct AMD network access, pass `--proxy <url>` to route Claude traffic through an HTTP proxy (sets `proxy` in `settings.local.json` and `claudeCode.proxyUrl` in VS Code settings — no `*_PROXY` env vars):
 
 ```bash
-./install.sh           # direct AMD network access (default)
-./install.sh --proxy   # SSH-tunnel machines (adds HTTP_PROXY vars)
+./install.sh                                    # direct AMD network access (e.g. WSL2 + ZScaler)
+./install.sh --proxy http://10.0.0.107:8888     # LAN nodes via AMD laptop tinyproxy
+./install.sh --proxy                            # SSH-tunnel nodes (defaults to http://127.0.0.1:8888)
 ```
+
+Rerunning without `--proxy` removes the proxy setting, making it idempotent in both directions.
 
 ### Docker + Zscaler
 
@@ -72,16 +75,8 @@ A full install (no package arguments) also generates `~/.claude/settings.local.j
 - Generates `~/.docker/buildkitd.toml` from `templates/buildkitd.toml`
 - Attempts to create/use a buildx builder (`global-corporate-builder` by default) using that config
 
-Use direct Zscaler/system-proxy mode (recommended) by default:
-
 ```bash
 ./install.sh
-```
-
-Use tunnel/proxy mode when the machine must route via localhost proxy:
-
-```bash
-./install.sh --proxy
 ```
 
 Optional overrides:

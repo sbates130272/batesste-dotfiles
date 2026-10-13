@@ -4,11 +4,12 @@ set -euo pipefail
 DOTFILES_DIR="${DOTFILES_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 
 _DO_FORCE=0
-_DO_PROXY=0
+_PROXY_URL=""
 _DATESTAMP=""
 _OLD_ROOT=""
 _CA_BUNDLE_SRC="${ZSCALER_CA_BUNDLE_SRC:-/etc/ssl/certs/ca-certificates.crt}"
-_BUILDX_BUILDER_NAME="${BUILDX_BUILDER_NAME:-global-corporate-builder}"
+_BUILDX_BUILDER_NAME="${BUILDX_BUILDER_NAME:-amd-moby-buildkit}"
+_BUILDX_NODES=("APCAN-MQ60818VV")
 _STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles"
 _STATE_FILE="$_STATE_DIR/install-state"
 
@@ -19,6 +20,12 @@ _STATE_FILE="$_STATE_DIR/install-state"
 _NON_PACKAGES=(templates scripts vendor)
 
 log() { echo "[dotfiles] $*"; }
+
+is_buildx_node() {
+    local h; h="$(hostname)"
+    local n; for n in "${_BUILDX_NODES[@]}"; do [[ "$h" == "$n" ]] && return 0; done
+    return 1
+}
 
 is_package() {
     local candidate="$1" np
@@ -274,14 +281,15 @@ stow_package() {
 
 
 usage() {
-    echo "Usage: $0 [--proxy] [--force] [--ca-bundle <path>] [packages...]"
+    echo "Usage: $0 [--proxy [url]] [--force] [--ca-bundle <path>] [packages...]"
     echo ""
     echo "Options:"
-    echo "  --proxy       Route Claude traffic through the local SSH tunnel on"
-    echo "                localhost:8888. Sets HTTP_PROXY/HTTPS_PROXY only inside"
-    echo "                ~/.claude/settings.local.json and VS Code claudeCode.environmentVariables"
-    echo "                so non-Claude tools (curl, apt, Docker, etc.) go direct."
-    echo "                Use on machines where llm-api.amd.com is reachable only via tunnel."
+    echo "  --proxy [url] Route Claude traffic through an HTTP proxy. Sets claudeCode.proxy"
+    echo "                in ~/.claude/settings.local.json (Claude-scoped; no *_PROXY env vars)."
+    echo "                url defaults to http://127.0.0.1:8888 if omitted."
+    echo "                Use http://<host>:8888 on LAN nodes that reach the AMD tinyproxy"
+    echo "                directly (e.g. --proxy http://10.0.0.107:8888)."
+    echo "                Rerunning without --proxy removes the proxy setting (idempotent)."
     echo "  --ca-bundle   Source CA bundle path copied to ~/.docker/certs/ca-certificates.crt"
     echo "                before generating ~/.docker/buildkitd.toml (default:"
     echo "                /etc/ssl/certs/ca-certificates.crt)."
@@ -295,7 +303,8 @@ usage() {
     echo ""
     echo "Environment overrides:"
     echo "  ZSCALER_CA_BUNDLE_SRC   Default value for --ca-bundle."
-    echo "  BUILDX_BUILDER_NAME     Docker buildx builder name (default: global-corporate-builder)."
+    echo "  BUILDX_BUILDER_NAME     Docker buildx builder name (default: amd-moby-buildkit).
+                          Docker buildkit setup only runs on nodes in _BUILDX_NODES."
     echo ""
     echo "Available packages:"
     for d in "$DOTFILES_DIR"/*/; do
@@ -321,7 +330,14 @@ main() {
     while [[ $i -lt ${#argv[@]} ]]; do
         local arg="${argv[$i]}"
         if [[ "$arg" == "--proxy" ]]; then
-            _DO_PROXY=1
+            # Optional URL follows; if next token looks like a URL take it,
+            # otherwise default to localhost tunnel.
+            if [[ $((i + 1)) -lt ${#argv[@]} && "${argv[$((i + 1))]}" == http* ]]; then
+                i=$((i + 1))
+                _PROXY_URL="${argv[$i]}"
+            else
+                _PROXY_URL="http://127.0.0.1:8888"
+            fi
         elif [[ "$arg" == "--ca-bundle" ]]; then
             if [[ $((i + 1)) -ge ${#argv[@]} ]]; then
                 echo "ERROR: --ca-bundle requires a path argument" >&2
@@ -470,27 +486,31 @@ expand_templates() {
         chmod 600 "$HOME/.config/gh/tokens.env"
         log "Expanded gh/tokens.env"
 
-        DOCKER_AUTH=$(printf '%s:%s' "$DOCKER_USERNAME" "$DOCKER_PAT" | base64 -w 0)
-        export DOCKER_AUTH
+        if is_buildx_node; then
+            DOCKER_AUTH=$(printf '%s:%s' "$DOCKER_USERNAME" "$DOCKER_PAT" | base64 -w 0)
+            export DOCKER_AUTH
 
-        install -d "$HOME/.docker"
-        envsubst < "$tmpl_dir/docker-config.json" > "$HOME/.docker/config.json"
-        chmod 600 "$HOME/.docker/config.json"
-        log "Expanded docker/config.json"
+            install -d "$HOME/.docker"
+            envsubst < "$tmpl_dir/docker-config.json" > "$HOME/.docker/config.json"
+            chmod 600 "$HOME/.docker/config.json"
+            log "Expanded docker/config.json"
 
-        install -d "$HOME/.docker/certs"
-        if [[ -f "$_CA_BUNDLE_SRC" ]]; then
-            cp "$_CA_BUNDLE_SRC" "$HOME/.docker/certs/ca-certificates.crt"
-            chmod 644 "$HOME/.docker/certs/ca-certificates.crt"
-            log "Copied CA bundle to ~/.docker/certs/ca-certificates.crt"
+            install -d "$HOME/.docker/certs"
+            if [[ -f "$_CA_BUNDLE_SRC" ]]; then
+                cp "$_CA_BUNDLE_SRC" "$HOME/.docker/certs/ca-certificates.crt"
+                chmod 644 "$HOME/.docker/certs/ca-certificates.crt"
+                log "Copied CA bundle to ~/.docker/certs/ca-certificates.crt"
+            else
+                echo "[dotfiles] WARNING: CA bundle source not found: $_CA_BUNDLE_SRC" >&2
+                echo "           Skipping ~/.docker/certs/ca-certificates.crt copy." >&2
+            fi
+
+            envsubst < "$tmpl_dir/buildkitd.toml" > "$HOME/.docker/buildkitd.toml"
+            chmod 600 "$HOME/.docker/buildkitd.toml"
+            log "Generated ~/.docker/buildkitd.toml"
         else
-            echo "[dotfiles] WARNING: CA bundle source not found: $_CA_BUNDLE_SRC" >&2
-            echo "           Skipping ~/.docker/certs/ca-certificates.crt copy." >&2
+            log "Skipping Docker buildkit config (not a buildx node)"
         fi
-
-        envsubst < "$tmpl_dir/buildkitd.toml" > "$HOME/.docker/buildkitd.toml"
-        chmod 600 "$HOME/.docker/buildkitd.toml"
-        log "Generated ~/.docker/buildkitd.toml"
 
         install -d "$HOME/.aws"
         envsubst < "$tmpl_dir/aws-credentials" > "$HOME/.aws/credentials"
@@ -565,6 +585,11 @@ PYEOF
 }
 
 bootstrap_buildx_builder() {
+    if ! is_buildx_node; then
+        log "Skipping buildx bootstrap (not a buildx node)"
+        return 0
+    fi
+
     local config="$HOME/.docker/buildkitd.toml"
 
     if ! command -v docker &>/dev/null; then
@@ -685,34 +710,18 @@ generate_claude_settings() {
         --arg key  "$ANTHROPIC_API_KEY" \
         '{NODE_EXTRA_CA_CERTS:$ca,ANTHROPIC_CUSTOM_HEADERS:$hdrs,ANTHROPIC_API_KEY:$key}')
 
-    if [[ "$_DO_PROXY" -eq 1 ]]; then
-        # NO_PROXY: exclude everything except llm-api.amd.com so only Claude
-        # traffic routes through the SSH tunnel on localhost:8888.
-        local noproxy="localhost,127.0.0.1,::1,*.local,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
-        noproxy="${noproxy},github.com,.github.com,raw.githubusercontent.com,api.github.com"
-        noproxy="${noproxy},codeload.github.com,objects.githubusercontent.com"
-        noproxy="${noproxy},registry.npmjs.org,pypi.org,.pypi.org,files.pythonhosted.org"
-        noproxy="${noproxy},crates.io,static.crates.io"
-        noproxy="${noproxy},proxy.golang.org,sum.golang.org,pkg.go.dev"
-        noproxy="${noproxy},conda.anaconda.org,repo.anaconda.com,.anaconda.org"
-        noproxy="${noproxy},docker.io,registry-1.docker.io,auth.docker.io"
-        noproxy="${noproxy},production.cloudflare.docker.com"
-        noproxy="${noproxy},ghcr.io,quay.io,mcr.microsoft.com,registry.k8s.io"
-        noproxy="${noproxy},huggingface.co,.huggingface.co,.hf.co"
-        noproxy="${noproxy},repo.radeon.com,download.amd.com"
-        noproxy="${noproxy},archive.ubuntu.com,security.ubuntu.com,deb.debian.org"
-        env_add=$(jq \
-            --arg np "$noproxy" \
-            '. + {HTTP_PROXY:"http://127.0.0.1:8888",HTTPS_PROXY:"http://127.0.0.1:8888",NO_PROXY:$np}' \
-            <<<"$env_add")
-    fi
-
     ( umask 077
+      # Merge template over existing, apply env_add, then set or clear proxy.
+      # Also strip any stale *_PROXY env vars left by a previous install.
       jq -n \
           --argjson e "$existing" \
           --argjson t "$(cat "$tmpl")" \
           --argjson a "$env_add" \
-          '$e * $t | .env = (($e.env // {}) * ($t.env // {}) * $a)' \
+          --arg pu  "$_PROXY_URL" \
+          '($e * $t) |
+           .env = (($e.env // {}) * ($t.env // {}) * $a
+                   | del(.HTTP_PROXY, .HTTPS_PROXY, .NO_PROXY)) |
+           if $pu != "" then .proxy = $pu else del(.proxy) end' \
           > "$out_tmp"
       mv "$out_tmp" "$out" )
     chmod 600 "$out"
@@ -727,15 +736,16 @@ generate_vscode_settings() {
     install -d "$(dirname "$vscode_settings")"
     [[ -f "$vscode_settings" ]] || echo '{}' > "$vscode_settings"
 
-    local proxy_url=""
-    [[ "$_DO_PROXY" -eq 1 ]] && proxy_url="http://127.0.0.1:8888"
-
-    python3 - "$vscode_settings" "$ANTHROPIC_CUSTOM_HEADERS" "$ANTHROPIC_API_KEY" "$proxy_url" <<'PYEOF'
+    python3 - "$vscode_settings" "$ANTHROPIC_CUSTOM_HEADERS" "$ANTHROPIC_API_KEY" "$_PROXY_URL" <<'PYEOF'
 import sys, json
 path, custom_headers, api_key, proxy_url = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 with open(path) as f:
     s = json.load(f)
-env = [
+# Strip any stale *_PROXY vars left by a previous install.
+stale = {"HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY"}
+env = [e for e in s.get("claudeCode.environmentVariables", [])
+       if e.get("name") not in stale]
+for entry in [
     {"name": "ANTHROPIC_CUSTOM_HEADERS",       "value": custom_headers},
     {"name": "ANTHROPIC_API_KEY",              "value": api_key},
     {"name": "NODE_EXTRA_CA_CERTS",            "value": "/etc/ssl/certs/ca-certificates.crt"},
@@ -744,30 +754,14 @@ env = [
     {"name": "ANTHROPIC_DEFAULT_OPUS_MODEL",   "value": "Claude-Opus-5"},
     {"name": "ANTHROPIC_DEFAULT_SONNET_MODEL", "value": "Claude-Sonnet-4.6"},
     {"name": "ANTHROPIC_DEFAULT_HAIKU_MODEL",  "value": "Claude-Haiku-4.5"},
-]
-if proxy_url:
-    noproxy = (
-        "localhost,127.0.0.1,::1,*.local"
-        ",10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
-        ",github.com,.github.com,raw.githubusercontent.com,api.github.com"
-        ",codeload.github.com,objects.githubusercontent.com"
-        ",registry.npmjs.org,pypi.org,.pypi.org,files.pythonhosted.org"
-        ",crates.io,static.crates.io"
-        ",proxy.golang.org,sum.golang.org,pkg.go.dev"
-        ",conda.anaconda.org,repo.anaconda.com,.anaconda.org"
-        ",docker.io,registry-1.docker.io,auth.docker.io"
-        ",production.cloudflare.docker.com"
-        ",ghcr.io,quay.io,mcr.microsoft.com,registry.k8s.io"
-        ",huggingface.co,.huggingface.co,.hf.co"
-        ",repo.radeon.com,download.amd.com"
-        ",archive.ubuntu.com,security.ubuntu.com,deb.debian.org"
-    )
-    env += [
-        {"name": "HTTP_PROXY",  "value": proxy_url},
-        {"name": "HTTPS_PROXY", "value": proxy_url},
-        {"name": "NO_PROXY",    "value": noproxy},
-    ]
+]:
+    env = [e for e in env if e["name"] != entry["name"]]
+    env.append(entry)
 s["claudeCode.environmentVariables"] = env
+if proxy_url:
+    s["claudeCode.proxyUrl"] = proxy_url
+else:
+    s.pop("claudeCode.proxyUrl", None)
 s["claudeCode.allowDangerouslySkipPermissions"] = True
 s["claudeCode.initialPermissionMode"] = "bypassPermissions"
 s["telemetry.telemetryLevel"] = "off"
