@@ -741,7 +741,7 @@ import sys, json
 path, custom_headers, api_key, proxy_url = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 with open(path) as f:
     s = json.load(f)
-# Strip any stale *_PROXY vars left by a previous install.
+# Build env list; always strip stale *_PROXY vars first then re-add if needed.
 stale = {"HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY"}
 env = [e for e in s.get("claudeCode.environmentVariables", [])
        if e.get("name") not in stale]
@@ -757,7 +757,35 @@ for entry in [
 ]:
     env = [e for e in env if e["name"] != entry["name"]]
     env.append(entry)
+# claudeCode.proxyUrl doesn't intercept DNS lookups in Node.js; HTTP_PROXY/
+# HTTPS_PROXY env vars are required so the https module uses the proxy agent
+# before resolving the hostname. NO_PROXY scopes this to Claude traffic only.
+if proxy_url:
+    noproxy = (
+        "localhost,127.0.0.1,::1,*.local"
+        ",10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+        ",github.com,.github.com,raw.githubusercontent.com,api.github.com"
+        ",codeload.github.com,objects.githubusercontent.com"
+        ",registry.npmjs.org,pypi.org,.pypi.org,files.pythonhosted.org"
+        ",crates.io,static.crates.io"
+        ",proxy.golang.org,sum.golang.org,pkg.go.dev"
+        ",conda.anaconda.org,repo.anaconda.com,.anaconda.org"
+        ",docker.io,registry-1.docker.io,auth.docker.io"
+        ",production.cloudflare.docker.com"
+        ",ghcr.io,quay.io,mcr.microsoft.com,registry.k8s.io"
+        ",huggingface.co,.huggingface.co,.hf.co"
+        ",repo.radeon.com,download.amd.com"
+        ",archive.ubuntu.com,security.ubuntu.com,deb.debian.org"
+    )
+    for entry in [
+        {"name": "HTTP_PROXY",  "value": proxy_url},
+        {"name": "HTTPS_PROXY", "value": proxy_url},
+        {"name": "NO_PROXY",    "value": noproxy},
+    ]:
+        env = [e for e in env if e["name"] != entry["name"]]
+        env.append(entry)
 s["claudeCode.environmentVariables"] = env
+# Keep proxyUrl in sync for any future extension versions that honour it.
 if proxy_url:
     s["claudeCode.proxyUrl"] = proxy_url
 else:
@@ -805,6 +833,25 @@ check_gpg_key() {
         echo "           git-crypt unlock and GPG commit signing will not work until"
         echo "           this key is imported. Transfer it from another machine with:"
         echo "             gpg --export-secret-keys $fingerprint | gpg --import"
+    fi
+
+    # Also verify the configured signing key (which may be a subkey distinct
+    # from the git-crypt primary). Strip the trailing '!' that forces exact
+    # subkey selection before passing to gpg.
+    local gitconfig="$DOTFILES_DIR/git/.gitconfig"
+    local signing_key
+    signing_key="$(grep -m1 '^\s*signingkey\s*=' "$gitconfig" 2>/dev/null \
+        | sed 's/.*=\s*//; s/!$//')"
+    if [[ -z "$signing_key" ]]; then
+        return
+    fi
+    if ! gpg --list-secret-keys "$signing_key" &>/dev/null 2>&1; then
+        echo ""
+        echo "[dotfiles] WARNING: GPG signing key $signing_key is not available."
+        echo "           Git commits will fail until this key is imported."
+        echo "           If this is a subkey, export it from the machine that has it:"
+        echo "             gpg --export-secret-subkeys $signing_key | gpg --import"
+        echo "           Or revert to the primary key by setting signingkey in git/.gitconfig."
     fi
 }
 
