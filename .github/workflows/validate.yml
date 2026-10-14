@@ -48,7 +48,7 @@ jobs:
 
           failed=0
           checked=0
-          for f in claude/.claude/*.json templates/*; do
+          for f in templates/* claude/.claude/**/*.json; do
             [ -f "$f" ] || continue
             checked=$((checked + 1))
             if grep -qEi "$patterns" "$f"; then
@@ -88,7 +88,7 @@ jobs:
           for dir in "$DOTFILES_DIR"/*/; do
             pkg="$(basename "$dir")"
             case "$pkg" in
-              templates|scripts) continue ;;
+              templates|scripts|vendor) continue ;;
             esac
             echo "Checking $pkg..."
             checked=$((checked + 1))

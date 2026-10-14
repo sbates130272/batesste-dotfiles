@@ -20,10 +20,10 @@ Each top-level directory is a **stow package** — its contents mirror `$HOME`. 
 ```text
 ansible/       # ~/.ansible.cfg
 aws/           # ~/.aws/config (non-secret region/output settings)
-bash/          # ~/.bashrc, ~/.profile
-claude/        # ~/.claude/settings.json and hooks
+bash/          # ~/.bashrc, ~/.bash_aliases, ~/.profile
+claude/        # ~/.claude/CLAUDE.md, hooks, commands, skills
 docker/        # ~/.docker/daemon.json
-emacs/         # ~/.emacs, ~/.emacs.d/init.el
+emacs/         # ~/.emacs.d/init.el
 gh/            # ~/.config/gh/config.yml (non-secret gh settings)
 git/           # ~/.gitconfig, ~/.config/git/hooks/pre-commit
 gpg/           # ~/.gnupg/gpg-agent.conf (pinentry and agent settings)
@@ -57,7 +57,7 @@ git-crypt unlock    # requires your GPG private key
 ./install.sh
 ```
 
-A full install (no package arguments) also generates `~/.claude/settings.local.json` from `templates/claude-settings-local.json`, writes the VS Code Machine settings, and installs the [AMD skills](https://github.com/amd/skills) into `~/.claude/skills/`. On machines without direct AMD network access, pass `--proxy <url>` to route Claude traffic through an HTTP proxy (sets `proxy` in `settings.local.json` and `claudeCode.proxyUrl` in VS Code settings — no `*_PROXY` env vars):
+A full install (no package arguments) also generates `~/.claude/settings.local.json` from `templates/claude-settings-local.json`, writes the VS Code Machine settings, and installs the [AMD skills](https://github.com/amd/skills) into `~/.claude/skills/`. On machines without direct AMD network access, pass `--proxy <url>` to route Claude traffic through an HTTP proxy (sets `proxy` in `settings.local.json`, `claudeCode.proxyUrl` in VS Code settings, and `HTTP_PROXY`/`HTTPS_PROXY` in the VS Code extension environment):
 
 ```bash
 ./install.sh                                    # direct AMD network access (e.g. WSL2 + ZScaler)
@@ -73,7 +73,7 @@ Rerunning without `--proxy` removes the proxy setting, making it idempotent in b
 
 - Copies a CA bundle to `~/.docker/certs/ca-certificates.crt` (default source: `/etc/ssl/certs/ca-certificates.crt`)
 - Generates `~/.docker/buildkitd.toml` from `templates/buildkitd.toml`
-- Attempts to create/use a buildx builder (`global-corporate-builder` by default) using that config
+- Attempts to create/use a buildx builder (`amd-moby-buildkit` by default) using that config
 
 ```bash
 ./install.sh

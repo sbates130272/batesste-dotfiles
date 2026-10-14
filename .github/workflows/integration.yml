@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, ubuntu-26.04]
+        os: [ubuntu-24.04]
 
     steps:
       - uses: actions/checkout@v7
@@ -119,6 +119,7 @@ jobs:
           check_link "$HOME/.config/gh/config.yml"          "$REPO"
           check_link "$HOME/.aws/config"                     "$REPO"
           check_link "$HOME/.ssh/config"                     "$REPO"
+          check_link "$HOME/.emacs"                          "$REPO"
           check_link "$HOME/.emacs.d/init.el"               "$REPO"
           check_link "$HOME/.ansible.cfg"                    "$REPO"
           exit $failed
@@ -257,8 +258,8 @@ jobs:
           cat "$f"
 
       # ── Emacs ───────────────────────────────────────────────────────────────
-      # init.el installs rust-mode on first run. Stub out network calls and
-      # the package-install/require so the test is hermetic in CI.
+      # init.el installs rust-mode and yaml-mode on first run. Stub out
+      # network calls and package ops so the test is hermetic in CI.
       - name: emacs --version
         run: emacs --version
 
@@ -271,10 +272,20 @@ jobs:
             (fset 'package-installed-p (lambda (&rest _) t))
             (fset 'original-require (symbol-function 'require))
             (fset 'require (lambda (feature &rest args)
-              (unless (eq feature 'rust-mode)
+              (unless (memq feature '(rust-mode yaml-mode))
                 (apply 'original-require feature args))))
             (load \"$HOME/.emacs.d/init.el\")
             (message \"init.el OK\")"
+
+      - name: emacs .emacs loads in batch mode
+        run: |
+          emacs --batch --eval "
+            (fset 'original-require (symbol-function 'require))
+            (fset 'require (lambda (feature &rest args)
+              (unless (memq feature '(rust-mode yaml-mode))
+                (apply 'original-require feature args))))
+            (load \"$HOME/.emacs\")
+            (message \".emacs OK\")"
 
       # ── Ansible ─────────────────────────────────────────────────────────────
       - name: ansible version

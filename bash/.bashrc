@@ -9,10 +9,6 @@ if [ -f "$HOME/.config/claude/env.sh" ]; then
   . "$HOME/.config/claude/env.sh"
 fi
 
-# Proxy env (written by install.sh --proxy; absent on direct-network nodes).
-if [ -f "$HOME/.config/proxy-env.sh" ]; then
-  . "$HOME/.config/proxy-env.sh"
-fi
 
 # If not running interactively, don't do anything
 case $- in
@@ -195,7 +191,7 @@ gh-as() {
 # Run a git command using the ROCm-scoped PAT.
 # Usage: rocm-git clone https://github.com/ROCm/rocm-systems.git
 rocm-git() {
-  GH_TOKEN="${GH_TOKEN_SBATES130272_ROCM}" git "$@"
+  GITHUB_TOKEN="${GH_TOKEN_SBATES130272_ROCM}" git "$@"
 }
 
 export EDITOR=emacs

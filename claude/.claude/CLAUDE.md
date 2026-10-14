@@ -45,4 +45,4 @@ Three tokens are in play; pick the right one for the operation:
 - Switch to a named account only when the fine-grained PAT lacks the required scope: `gh auth switch -u <account>`
 - Use `gh-as <TOKEN_NAME> <args>` to run a single command under an alternate token without changing the active account
 - Use `gh-token-check` to see expiry status of all registered tokens
-- For ROCm git operations use `rocm-git <args>` (wraps git with `GH_TOKEN` set to the fine-grained PAT)
+- For ROCm git operations use `rocm-git <args>` (wraps git with `GITHUB_TOKEN` set to the fine-grained PAT)
