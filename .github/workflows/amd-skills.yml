@@ -43,7 +43,7 @@ jobs:
       - name: Verify skills installed
         run: |
           failed=0
-          for skill in local-ai-use local-ai-app-integration serving-llms-on-instinct; do
+          for skill in local-ai-use local-ai-app-integration serving-llms-on-instinct serving-llms-on-epyc hyperloom-workload-optimizer lemonade-router-builder magpie-kernel-evaluator tracelens-analysis-orchestrator; do
             f="$HOME/.claude/skills/$skill/SKILL.md"
             [ -f "$f" ] && echo "OK: $f" || { echo "ERROR: $f missing"; failed=1; }
           done
