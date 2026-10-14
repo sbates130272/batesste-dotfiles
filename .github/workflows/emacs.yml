@@ -30,13 +30,22 @@ jobs:
 
       - name: Verify stow symlinks
         run: |
-          for f in "$HOME/.emacs" "$HOME/.emacs.d/init.el"; do
-            if [ ! -L "$f" ]; then
-              echo "ERROR: $f is not a symlink (stow did not link it)"
-              exit 1
+          # stow may fold a package subdir into a single symlink on the parent,
+          # so walk up until we find the symlink (same logic as integration.yml).
+          check_link() {
+            local f="$1"
+            local check="$f"
+            while [ "$check" != "/" ] && [ ! -L "$check" ]; do
+              check="$(dirname "$check")"
+            done
+            if [ ! -L "$check" ]; then
+              echo "ERROR: $f — no symlink found in path"
+              return 1
             fi
-            echo "OK: $f -> $(readlink -f "$f")"
-          done
+            echo "OK: $f (symlink at $check -> $(readlink -f "$check"))"
+          }
+          check_link "$HOME/.emacs"
+          check_link "$HOME/.emacs.d/init.el"
 
       # Stub out package operations and mode requires so the test is hermetic:
       # no network access, no ELPA/MELPA, no real package installs.
