@@ -1,0 +1,100 @@
+name: Emacs
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: emacs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  emacs-config:
+    name: emacs config loads cleanly
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install emacs
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q emacs-nox
+
+      - name: Stow emacs package
+        run: |
+          sudo apt-get install -y -q stow
+          stow --dir="$PWD" --target="$HOME" emacs
+
+      - name: Verify stow symlinks
+        run: |
+          for f in "$HOME/.emacs" "$HOME/.emacs.d/init.el"; do
+            if [ ! -L "$f" ]; then
+              echo "ERROR: $f is not a symlink (stow did not link it)"
+              exit 1
+            fi
+            echo "OK: $f -> $(readlink -f "$f")"
+          done
+
+      # Stub out package operations and mode requires so the test is hermetic:
+      # no network access, no ELPA/MELPA, no real package installs.
+      - name: init.el loads in batch mode
+        run: |
+          emacs --batch --eval "
+            (fset 'package-refresh-contents (lambda (&rest _) nil))
+            (fset 'package-initialize (lambda (&rest _) nil))
+            (fset 'package-install (lambda (&rest _) nil))
+            (fset 'package-installed-p (lambda (&rest _) t))
+            (fset 'original-require (symbol-function 'require))
+            (fset 'require (lambda (feature &rest args)
+              (unless (memq feature '(rust-mode yaml-mode))
+                (apply 'original-require feature args))))
+            (load \"$HOME/.emacs.d/init.el\")
+            (message \"init.el OK\")"
+
+      - name: .emacs loads in batch mode
+        run: |
+          emacs --batch --eval "
+            (fset 'package-refresh-contents (lambda (&rest _) nil))
+            (fset 'package-initialize (lambda (&rest _) nil))
+            (fset 'package-install (lambda (&rest _) nil))
+            (fset 'package-installed-p (lambda (&rest _) t))
+            (fset 'original-require (symbol-function 'require))
+            (fset 'require (lambda (feature &rest args)
+              (unless (memq feature '(rust-mode yaml-mode))
+                (apply 'original-require feature args))))
+            (load \"$HOME/.emacs\")
+            (message \".emacs OK\")"
+
+      - name: proxy env wires into url-proxy-services
+        run: |
+          emacs --batch --eval "
+            (fset 'package-refresh-contents (lambda (&rest _) nil))
+            (fset 'package-initialize (lambda (&rest _) nil))
+            (fset 'package-install (lambda (&rest _) nil))
+            (fset 'package-installed-p (lambda (&rest _) t))
+            (fset 'require (lambda (&rest _) nil))
+            (setenv \"HTTP_PROXY\" \"http://127.0.0.1:8888\")
+            (setenv \"REQUESTS_CA_BUNDLE\" \"/etc/ssl/certs/ca-certificates.crt\")
+            (load \"$HOME/.emacs.d/init.el\")
+            (unless (assoc \"http\" url-proxy-services)
+              (error \"url-proxy-services not set from HTTP_PROXY\"))
+            (message \"proxy wiring OK: %s\" url-proxy-services)"
+
+      - name: no proxy when HTTP_PROXY is unset
+        run: |
+          emacs --batch --eval "
+            (fset 'package-refresh-contents (lambda (&rest _) nil))
+            (fset 'package-initialize (lambda (&rest _) nil))
+            (fset 'package-install (lambda (&rest _) nil))
+            (fset 'package-installed-p (lambda (&rest _) t))
+            (fset 'require (lambda (&rest _) nil))
+            (setenv \"HTTP_PROXY\" nil)
+            (setenv \"http_proxy\" nil)
+            (setenv \"REQUESTS_CA_BUNDLE\" \"/etc/ssl/certs/ca-certificates.crt\")
+            (load \"$HOME/.emacs.d/init.el\")
+            (when (assoc \"http\" url-proxy-services)
+              (error \"url-proxy-services should be empty when no proxy env set\"))
+            (message \"no-proxy OK\")"

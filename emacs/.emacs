@@ -1,3 +1,10 @@
+;; init.el is skipped when ~/.emacs exists; load it explicitly so the
+;; package bootstrap and proxy setup always run first.
+(load (expand-file-name "~/.emacs.d/init.el"))
+
+;; Silently follow symlinks into version-controlled source (stow links).
+(setq vc-follow-symlinks t)
+
 (global-font-lock-mode 1)
 (line-number-mode 1)
 (column-number-mode 1)
