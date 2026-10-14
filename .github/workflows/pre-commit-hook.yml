@@ -41,7 +41,7 @@ jobs:
         run: |
           echo "hello world, this is plain text" > "$TESTREPO/plain.txt"
           git -C "$TESTREPO" add plain.txt
-          bash "$TESTREPO/.git/hooks/pre-commit" && echo "OK"
+          (cd "$TESTREPO" && bash .git/hooks/pre-commit) && echo "OK"
           git -C "$TESTREPO" restore --staged plain.txt
 
       - name: "FP: GitHub badge URLs (high-entropy in URL) pass"
@@ -51,7 +51,7 @@ jobs:
           [![Release](https://img.shields.io/github/v/release/sbates130272/batesste-dotfiles)](https://github.com/sbates130272/batesste-dotfiles/releases/latest)
           CONTENT
           git -C "$TESTREPO" add README.md
-          bash "$TESTREPO/.git/hooks/pre-commit" && echo "OK"
+          (cd "$TESTREPO" && bash .git/hooks/pre-commit) && echo "OK"
           git -C "$TESTREPO" restore --staged README.md
 
       - name: "FP: envsubst placeholders in templates pass"
@@ -63,7 +63,7 @@ jobs:
           HF_TOKEN=${HF_TOKEN}
           CONTENT
           git -C "$TESTREPO" add template.env
-          bash "$TESTREPO/.git/hooks/pre-commit" && echo "OK"
+          (cd "$TESTREPO" && bash .git/hooks/pre-commit) && echo "OK"
           git -C "$TESTREPO" restore --staged template.env
 
       - name: "FP: GPG signingkey fingerprint passes"
@@ -73,7 +73,7 @@ jobs:
               signingkey = ABCDEF1234567890ABCDEF1234567890ABCDEF12
           CONTENT
           git -C "$TESTREPO" add .gitconfig
-          bash "$TESTREPO/.git/hooks/pre-commit" && echo "OK"
+          (cd "$TESTREPO" && bash .git/hooks/pre-commit) && echo "OK"
           git -C "$TESTREPO" restore --staged .gitconfig
 
       - name: "FP: git SHA in COMMIT= context passes"
@@ -82,7 +82,7 @@ jobs:
           ACTIONS_COMMIT=a81bbbef738c88363b97e2ebe11c256ba8f0a1f6
           CONTENT
           git -C "$TESTREPO" add pin.sh
-          bash "$TESTREPO/.git/hooks/pre-commit" && echo "OK"
+          (cd "$TESTREPO" && bash .git/hooks/pre-commit) && echo "OK"
           git -C "$TESTREPO" restore --staged pin.sh
 
       - name: "FP: UUID (32 hex chars) in config passes"
@@ -91,7 +91,7 @@ jobs:
           session_id: a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4
           CONTENT
           git -C "$TESTREPO" add config.yaml
-          bash "$TESTREPO/.git/hooks/pre-commit" && echo "OK"
+          (cd "$TESTREPO" && bash .git/hooks/pre-commit) && echo "OK"
           git -C "$TESTREPO" restore --staged config.yaml
 
       - name: "FP: filesystem path in config passes"
@@ -100,7 +100,7 @@ jobs:
           ca_bundle: /etc/ssl/certs/ca-certificates.crt
           CONTENT
           git -C "$TESTREPO" add config.yaml
-          bash "$TESTREPO/.git/hooks/pre-commit" && echo "OK"
+          (cd "$TESTREPO" && bash .git/hooks/pre-commit) && echo "OK"
           git -C "$TESTREPO" restore --staged config.yaml
 
       - name: "FP: high-entropy text in a comment (no assignment) passes"
@@ -109,7 +109,7 @@ jobs:
           # See ZMmFBHgpPFQkaVJfLMqRTdNwXoYsKnCvbEuiSDjhy for the reference implementation
           CONTENT
           git -C "$TESTREPO" add notes.md
-          bash "$TESTREPO/.git/hooks/pre-commit" && echo "OK"
+          (cd "$TESTREPO" && bash .git/hooks/pre-commit) && echo "OK"
           git -C "$TESTREPO" restore --staged notes.md
 
       - name: "FP: short Docker auth field (<40 chars) passes"
@@ -118,7 +118,7 @@ jobs:
           {"auths":{"registry.example.com":{"auth":"dXNlcjpwYXNz"}}}
           CONTENT
           git -C "$TESTREPO" add docker.json
-          bash "$TESTREPO/.git/hooks/pre-commit" && echo "OK"
+          (cd "$TESTREPO" && bash .git/hooks/pre-commit) && echo "OK"
           git -C "$TESTREPO" restore --staged docker.json
 
       # ── True-positive tests (hook must exit 1) ───────────────────────────
@@ -132,7 +132,7 @@ jobs:
           VAL='sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789ABCD' # pre-commit: ignore
           echo "ANTHROPIC_API_KEY=$VAL" > "$TESTREPO/secret.txt"
           git -C "$TESTREPO" add secret.txt
-          rc=0; bash "$TESTREPO/.git/hooks/pre-commit" || rc=$?
+          rc=0; (cd "$TESTREPO" && bash .git/hooks/pre-commit) || rc=$?
           git -C "$TESTREPO" restore --staged secret.txt
           [ "$rc" -ne 0 ] && echo "OK: blocked" || { echo "ERROR: should have been blocked"; exit 1; }
 
@@ -141,7 +141,7 @@ jobs:
           VAL='hf_abcdefghijklmnopqrstuvwxyz012345678' # pre-commit: ignore
           echo "HF_TOKEN=$VAL" > "$TESTREPO/secret.txt"
           git -C "$TESTREPO" add secret.txt
-          rc=0; bash "$TESTREPO/.git/hooks/pre-commit" || rc=$?
+          rc=0; (cd "$TESTREPO" && bash .git/hooks/pre-commit) || rc=$?
           git -C "$TESTREPO" restore --staged secret.txt
           [ "$rc" -ne 0 ] && echo "OK: blocked" || { echo "ERROR: should have been blocked"; exit 1; }
 
@@ -150,7 +150,7 @@ jobs:
           VAL='ghp_abcdefghijklmnopqrstuvwxyz0123456789AB' # pre-commit: ignore
           echo "GITHUB_TOKEN=$VAL" > "$TESTREPO/secret.txt"
           git -C "$TESTREPO" add secret.txt
-          rc=0; bash "$TESTREPO/.git/hooks/pre-commit" || rc=$?
+          rc=0; (cd "$TESTREPO" && bash .git/hooks/pre-commit) || rc=$?
           git -C "$TESTREPO" restore --staged secret.txt
           [ "$rc" -ne 0 ] && echo "OK: blocked" || { echo "ERROR: should have been blocked"; exit 1; }
 
@@ -159,7 +159,7 @@ jobs:
           VAL='github_pat_abcdefghijklmnopqrstuvwxyz01234' # pre-commit: ignore
           echo "GITHUB_TOKEN=$VAL" > "$TESTREPO/secret.txt"
           git -C "$TESTREPO" add secret.txt
-          rc=0; bash "$TESTREPO/.git/hooks/pre-commit" || rc=$?
+          rc=0; (cd "$TESTREPO" && bash .git/hooks/pre-commit) || rc=$?
           git -C "$TESTREPO" restore --staged secret.txt
           [ "$rc" -ne 0 ] && echo "OK: blocked" || { echo "ERROR: should have been blocked"; exit 1; }
 
@@ -168,7 +168,7 @@ jobs:
           VAL='a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4' # pre-commit: ignore
           printf 'Ocp-Apim-Subscription-Key: %s\n' "$VAL" > "$TESTREPO/secret.txt"
           git -C "$TESTREPO" add secret.txt
-          rc=0; bash "$TESTREPO/.git/hooks/pre-commit" || rc=$?
+          rc=0; (cd "$TESTREPO" && bash .git/hooks/pre-commit) || rc=$?
           git -C "$TESTREPO" restore --staged secret.txt
           [ "$rc" -ne 0 ] && echo "OK: blocked" || { echo "ERROR: should have been blocked"; exit 1; }
 
@@ -177,7 +177,7 @@ jobs:
           VAL='dXNlcm5hbWU6c3VwZXJzZWNyZXRwYXNzd29yZHRoYXRpc2xvbmc=' # pre-commit: ignore
           printf '{"auths":{"registry.example.com":{"auth":"%s"}}}\n' "$VAL" > "$TESTREPO/secret.json"
           git -C "$TESTREPO" add secret.json
-          rc=0; bash "$TESTREPO/.git/hooks/pre-commit" || rc=$?
+          rc=0; (cd "$TESTREPO" && bash .git/hooks/pre-commit) || rc=$?
           git -C "$TESTREPO" restore --staged secret.json
           [ "$rc" -ne 0 ] && echo "OK: blocked" || { echo "ERROR: should have been blocked"; exit 1; }
 
@@ -186,6 +186,6 @@ jobs:
           VAL='ZMmFBHgpPFQkaVJfLMqRTdNwXoYsKnCvbEuiSDjhyABCDEF' # pre-commit: ignore
           echo "SECRET_KEY=$VAL" > "$TESTREPO/secret.txt"
           git -C "$TESTREPO" add secret.txt
-          rc=0; bash "$TESTREPO/.git/hooks/pre-commit" || rc=$?
+          rc=0; (cd "$TESTREPO" && bash .git/hooks/pre-commit) || rc=$?
           git -C "$TESTREPO" restore --staged secret.txt
           [ "$rc" -ne 0 ] && echo "OK: blocked" || { echo "ERROR: should have been blocked"; exit 1; }
