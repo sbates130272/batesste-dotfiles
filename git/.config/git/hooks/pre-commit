@@ -9,13 +9,15 @@ YELLOW='\033[0;33m'
 NC='\033[0m'
 
 # Patterns that strongly indicate a secret value (not just a key name).
-# Each entry is a label and a regex applied to staged file content.
+# Generic hex is intentionally absent: 32-char hex covers UUIDs and MD5 hashes
+# (not secrets), 40-char hex is a git SHA, and 48+ char hex is caught by the
+# high-entropy pattern below. Specific known formats are matched precisely.
 declare -A PATTERNS=(
     ["Anthropic API key"]='sk-ant-[a-zA-Z0-9_-]{20,}'
     ["HuggingFace token"]='hf_[a-zA-Z0-9]{20,}'
-    ["Docker auth (base64)"]='\"auth\":[[:space:]]*\"[A-Za-z0-9+/]{20,}={0,2}\"'
+    ["Docker auth (base64)"]='\"auth\":[[:space:]]*\"[A-Za-z0-9+/]{40,}={0,2}\"'
     ["GitHub token"]='gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{20,}'
-    ["Generic hex secret (32+ chars)"]='[0-9a-f]{32,}'
+    ["AMD API gateway key"]='Ocp-Apim-Subscription-Key:[[:space:]]*[0-9a-fA-F]{32}'
     ["Generic high-entropy string"]='[A-Za-z0-9+/]{40,}={0,2}'
 )
 
@@ -24,102 +26,113 @@ mapfile -t staged < <(git diff --cached --name-only --diff-filter=ACM)
 
 # Files declared as git-crypt encrypted in .gitattributes — safe to skip
 # whether the repo is locked (binary blob) or unlocked (plaintext).
-mapfile -t git_crypt_files < <(git check-attr filter -- "${staged[@]}" 2>/dev/null | awk -F': ' '$3 == "git-crypt" {print $1}')
+mapfile -t git_crypt_files < <(
+    [[ ${#staged[@]} -eq 0 ]] && exit 0
+    git check-attr filter -- "${staged[@]}" 2>/dev/null \
+        | awk -F': ' '$3 == "git-crypt" {print $1}'
+)
 declare -A git_crypt_set
 for f in "${git_crypt_files[@]}"; do git_crypt_set["$f"]=1; done
 
 found=0
-# Paths that are known-safe and should not be scanned for secrets.
-# Patch files (.patch, .diff) in a patches/ directory intentionally contain
-# git SHAs (40-char hex) and long file paths that trigger high-entropy patterns.
-# These are structural metadata, not credentials.
+
+# Paths where long hex strings and high-entropy patterns are structural, not secrets.
 declare -a SECRET_SCAN_ALLOWLIST=(
     "patches/"
 )
 
 for file in "${staged[@]}"; do
-    # Skip if file is not in the working tree (e.g. deleted)
     [[ -f "$file" ]] || continue
 
-    # Skip explicitly allowed paths (patch files with git SHAs, long kernel paths)
     _skip=0
     for _allowed in "${SECRET_SCAN_ALLOWLIST[@]}"; do
         [[ "$file" == "${_allowed}"* ]] && _skip=1 && break
     done
     [[ "$_skip" -eq 1 ]] && continue
 
-    # Skip files managed by git-crypt (encrypted at rest, safe regardless of lock state)
     [[ -n "${git_crypt_set[$file]:-}" ]] && continue
 
-    # Skip binary / git-crypt encrypted files (they start with \x00GITCRYPT)
     if head -c 10 "$file" | grep -qP '\x00GITCRYPT'; then
         continue
     fi
 
-    # Also skip if git detects it as binary
     if git diff --cached -- "$file" | grep -qP '^Binary'; then
         continue
     fi
 
-    # Skip X.509 certificate files — PEM base64 always triggers high-entropy
-    # patterns but is public infrastructure, not a secret.
+    # X.509 files: PEM base64 always triggers high-entropy but is public infra.
     if [[ "$file" =~ \.(crt|pem|cer|der)$ ]]; then
         continue
     fi
 
+    # Extract added lines (strip leading +), then normalize before matching:
+    #   1. Remove envsubst placeholders (${VAR}) — template files are safe.
+    #   2. Remove URLs — badge/shield URLs in Markdown are the canonical
+    #      false-positive source for the high-entropy pattern.
+    # Normalization is applied once here rather than per-pattern so the same
+    # clean content is used consistently across all pattern checks.
+    raw_lines="$(git diff --cached -- "$file" | grep -P '^\+[^+]' | sed 's/^\+//' || true)"
+    [[ -z "$raw_lines" ]] && continue
+
+    # Honour per-line opt-out annotations. Any line ending with
+    # "# pre-commit: ignore" (leading/trailing whitespace allowed) is dropped
+    # before pattern matching. Use this for intentional fake-secret test
+    # fixtures and documentation examples — analogous to # noqa / # nolint.
+    raw_lines="$(printf '%s\n' "$raw_lines" | grep -vP '#\s*pre-commit:\s*ignore\s*$' || true)"
+    [[ -z "$raw_lines" ]] && continue
+
+    normalized="$(printf '%s\n' "$raw_lines" \
+        | sed 's/\${[A-Za-z_][A-Za-z0-9_]*}//g' \
+        | sed 's|https\?://[^[:space:]"'"'"']*||g')"
+    [[ -z "$normalized" ]] && continue
+
     for label in "${!PATTERNS[@]}"; do
         regex="${PATTERNS[$label]}"
-        # Scan only added lines (+) in the staged diff, not the full file, to
-        # avoid false positives from pre-existing content like URLs.
-        matches="$(git diff --cached -- "$file" | grep -P '^\+[^+]' | grep -oP "$regex" || true)"
+
+        # For the high-entropy pattern only, restrict to lines with an assignment
+        # context (contains = or : followed by content). This eliminates long
+        # alphanumeric runs in comments, prose, and log output.
+        if [[ "$label" == "Generic high-entropy string" ]]; then
+            scan_lines="$(printf '%s\n' "$normalized" | grep -P '[:=]\s*["\x27]?[A-Za-z0-9+/]' || true)"
+        else
+            scan_lines="$normalized"
+        fi
+        [[ -z "$scan_lines" ]] && continue
+
+        matches="$(printf '%s\n' "$scan_lines" | grep -oP "$regex" || true)"
         [[ -z "$matches" ]] && continue
 
-        # Discard matches with no actual entropy. Git's null SHA is forty
-        # zeros, which satisfies both the hex and high-entropy patterns while
-        # being the one string guaranteed not to be a secret. Anything that is
-        # a single character repeated is a placeholder, not a credential.
+        # Discard single-character-repeated strings (null SHA, placeholder runs).
         matches="$(printf '%s\n' "$matches" | grep -vP '^(.)\1*$' || true)"
         [[ -z "$matches" ]] && continue
 
-        # Discard matches that appear inside a URL on the same line. Secrets
-        # are values, not URL path components — badge/shield URLs in Markdown
-        # are the canonical false-positive source for the high-entropy pattern.
-        url_lines="$(git diff --cached -- "$file" | grep -P '^\+[^+]' | grep -oP 'https?://\S+' | grep -oP "$regex" || true)"
-        matches="$(comm -23 <(printf '%s\n' "$matches" | sort) <(printf '%s\n' "$url_lines" | sort) || true)"
+        # Discard git SHAs used as version pins (COMMIT=, _commit:, git checkout…).
+        sha_ctx="$(printf '%s\n' "$scan_lines" \
+            | grep -P '(COMMIT[[:space:]]*[=:]|_commit[[:space:]]*:|git checkout|git rev-parse|_SHA[[:space:]]*[=:]|_HASH[[:space:]]*[=:])' \
+            | grep -oP "$regex" | sort -u || true)"
+        [[ -n "$sha_ctx" ]] && matches="$(printf '%s\n' "$matches" | grep -vFxf <(printf '%s\n' "$sha_ctx") || true)"
         [[ -z "$matches" ]] && continue
 
-        # Discard matches that are git commit SHAs used as version pins.
-        # Covers: COMMIT=/COMMIT = (shell/Python), _commit: (YAML key),
-        # git checkout, git rev-parse, and similar structural patterns.
-        sha_lines="$(git diff --cached -- "$file" | grep -P '^\+[^+]' | grep -P '(COMMIT[[:space:]]*[=:]|_commit[[:space:]]*:|git checkout|git rev-parse|_SHA[[:space:]]*[=:]|_HASH[[:space:]]*[=:])' | grep -oP "$regex" || true)"
-        matches="$(comm -23 <(printf '%s\n' "$matches" | sort) <(printf '%s\n' "$sha_lines" | sort) || true)"
+        # Discard GPG key fingerprints on signingkey lines (public info, not secrets).
+        gpg_ctx="$(printf '%s\n' "$scan_lines" \
+            | grep -P 'signingkey\s*=' \
+            | grep -oP "$regex" | sort -u || true)"
+        [[ -n "$gpg_ctx" ]] && matches="$(printf '%s\n' "$matches" | grep -vFxf <(printf '%s\n' "$gpg_ctx") || true)"
         [[ -z "$matches" ]] && continue
 
-        # Discard GPG key fingerprints on signingkey lines. A fingerprint is
-        # 40 hex chars (optionally followed by ! to pin a subkey) and is public
-        # information — it identifies a key, it is not the key itself.
-        gpg_lines="$(git diff --cached -- "$file" | grep -P '^\+[^+]' | grep -P 'signingkey\s*=' | grep -oP "$regex" || true)"
-        matches="$(comm -23 <(printf '%s\n' "$matches" | sort) <(printf '%s\n' "$gpg_lines" | sort) || true)"
+        # Discard bare exactly-40-char lowercase hex strings (git SHAs in YAML
+        # block scalars, action pins, etc. with no surrounding key context).
+        matches="$(printf '%s\n' "$matches" | grep -vP '^[0-9a-f]{40}$' || true)"
         [[ -z "$matches" ]] && continue
 
-        # Discard standalone exactly-40-char lowercase hex strings. These are
-        # git SHAs appearing as bare YAML block-scalar values with no key
-        # context on the same line.
-        sha_bare="$(printf '%s\n' "$matches" | grep -P '^[0-9a-f]{40}$' || true)"
-        matches="$(comm -23 <(printf '%s\n' "$matches" | sort) <(printf '%s\n' "$sha_bare" | sort) || true)"
-        [[ -z "$matches" ]] && continue
-
-        # Discard matches that are absolute filesystem paths. The separator
-        # is inside the high-entropy character class, so a path with ordinary
-        # directory names satisfies it while carrying no secret at all —
-        # /etc/prometheus/targets/discovered/alloy is 39 characters of plain
-        # directory. This is the same class of structural false positive the
-        # patches/ allowlist above exists for, but it shows up in any config
-        # that names a deep path, so filter the value rather than skipping
-        # the whole file. Anchored on real filesystem roots: a base64 blob
-        # does not begin with /etc/, so credentials are still caught.
-        path_lines="$(git diff --cached -- "$file" | grep -P '^\+[^+]' | grep -oP '(?<![A-Za-z0-9])/(?:etc|usr|var|home|opt|srv|tmp)/(?:[A-Za-z0-9._+-]+/)*[A-Za-z0-9._+-]+' | grep -oP "$regex" || true)"
-        matches="$(comm -23 <(printf '%s\n' "$matches" | sort) <(printf '%s\n' "$path_lines" | sort) || true)"
+        # Discard filesystem paths. The high-entropy character class includes
+        # alphanumerics and slash, so deep directory paths satisfy it even though
+        # they carry no entropy. Anchored on real filesystem roots so base64
+        # blobs (which don't start with /etc/) are still caught.
+        path_ctx="$(printf '%s\n' "$scan_lines" \
+            | grep -oP '(?<![A-Za-z0-9])/(?:etc|usr|var|home|opt|srv|tmp)/(?:[A-Za-z0-9._+-]+/)*[A-Za-z0-9._+-]+' \
+            | grep -oP "$regex" | sort -u || true)"
+        [[ -n "$path_ctx" ]] && matches="$(printf '%s\n' "$matches" | grep -vFxf <(printf '%s\n' "$path_ctx") || true)"
         [[ -z "$matches" ]] && continue
 
         echo -e "${RED}[pre-commit] Possible secret detected in $file${NC}"
