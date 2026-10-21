@@ -1,17 +1,25 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git status:*)",
-      "Bash(git log:*)",
-      "Bash(git diff:*)",
-      "Bash(ls:*)",
-      "Bash(find:*)",
-      "Bash(grep:*)",
       "Read(**)",
-      "Bash(ss -tlnp)",
-      "Bash(netstat -tlnp)",
       "Bash(ssh -f -N -R 8888:127.0.0.1:8888 snoc-think)",
-      "Bash(docker:*)"
+      "Bash(docker *)",
+      "mcp__github-new__get_job_logs",
+      "mcp__github-new__pull_request_read",
+      "mcp__github-new__search_repositories",
+      "mcp__github-new__get_file_contents",
+      "Bash(shellcheck *)",
+      "Bash(nm *)",
+      "Bash(dkms status *)",
+      "Bash(qemu-tool list *)",
+      "Bash(qemu-tool inspect *)",
+      "Bash(objdump *)",
+      "Bash(atlassian confluence search *)",
+      "Bash(atlassian confluence space list *)",
+      "Bash(atlassian auth status *)",
+      "Bash(pip show *)",
+      "WebFetch",
+      "WebSearch"
     ],
     "deny": [
       "Read(./.env)",
@@ -26,8 +34,7 @@
       "Bash(rm -rf:*)",
       "Bash(env:*)",
       "Bash(printenv:*)",
-      "Bash(set:*)",
-      "WebFetch"
+      "Bash(set:*)"
     ],
     "ask": [
       "Bash(git push:*)",
