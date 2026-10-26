@@ -10,6 +10,7 @@ _OLD_ROOT=""
 _CA_BUNDLE_SRC="${ZSCALER_CA_BUNDLE_SRC:-/etc/ssl/certs/ca-certificates.crt}"
 _ZSCALER_CA_CERT="${ZSCALER_CA_CERT:-/usr/local/share/ca-certificates/amd-corp-cert-zscalar.crt}"
 _BUILDKIT_IMAGE="${BUILDKIT_IMAGE:-local/buildkit-amd:latest}"
+_ALPINE_IMAGE="${ALPINE_IMAGE:-local/alpine-amd:3.20}"
 _BUILDX_BUILDER_NAME="${BUILDX_BUILDER_NAME:-amd-moby-buildkit}"
 _BUILDX_NODES=("APCAN-MQ60818VV")
 _STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles"
@@ -387,6 +388,8 @@ main() {
 
     if [[ "$full_install" -eq 1 ]]; then
         expand_templates
+        build_alpine_image
+        write_buildx_env
         build_buildkit_image
         bootstrap_buildx_builder
         install_git_hooks
@@ -586,6 +589,46 @@ PYEOF
         log "Pre-approved API key in $claude_json"
     )
     install_amd_skills
+}
+
+build_alpine_image() {
+    if ! is_buildx_node; then return 0; fi
+    if ! command -v docker &>/dev/null; then return 0; fi
+    if [[ ! -f "$_ZSCALER_CA_CERT" ]]; then
+        echo "[dotfiles] WARNING: $_ZSCALER_CA_CERT not found; skipping custom Alpine image." >&2
+        return 0
+    fi
+    if docker image inspect "$_ALPINE_IMAGE" &>/dev/null; then
+        log "Alpine image $_ALPINE_IMAGE already exists"
+        return 0
+    fi
+    local tmpdir; tmpdir=$(mktemp -d)
+    # shellcheck disable=SC2064
+    trap "rm -rf $tmpdir" RETURN
+    cp "$_ZSCALER_CA_CERT" "$tmpdir/zscalar.crt"
+    cat > "$tmpdir/Dockerfile" << 'EOF'
+FROM alpine:3.20
+COPY zscalar.crt /usr/local/share/ca-certificates/
+RUN cat /usr/local/share/ca-certificates/zscalar.crt \
+        >> /etc/ssl/certs/ca-certificates.crt
+EOF
+    if ! docker build --builder default -t "$_ALPINE_IMAGE" "$tmpdir" &>/dev/null; then
+        echo "[dotfiles] WARNING: failed to build custom Alpine image $_ALPINE_IMAGE." >&2
+        return 0
+    fi
+    log "Built custom Alpine image $_ALPINE_IMAGE"
+}
+
+write_buildx_env() {
+    if ! is_buildx_node; then return 0; fi
+    if [[ ! -f "$_ZSCALER_CA_CERT" ]]; then return 0; fi
+    local envd="$HOME/.config/environment.d"
+    local envf="$envd/60-buildx.conf"
+    install -d "$envd"
+    # Base64-encode the cert so it survives as a single-line env var.
+    # The tapsetup Dockerfile decodes AMD_CERT and appends it before apk runs.
+    printf 'AMD_CERT=%s\n' "$(base64 -w 0 < "$_ZSCALER_CA_CERT")" > "$envf"
+    log "Wrote AMD_CERT to $envf (takes effect on next login)"
 }
 
 build_buildkit_image() {
