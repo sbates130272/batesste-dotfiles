@@ -205,3 +205,12 @@ export PATH="/usr/lib/ccache:$PATH"
 
 # CA bundle for Claude CLI (WSL + AMD ZScaler)
 export REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
+
+# argcomplete for uv-installed tools — add tool names here as needed
+_UV_ARGCOMPLETE_TOOLS=(qemu-tool)
+for _tool in "${_UV_ARGCOMPLETE_TOOLS[@]}"; do
+    if command -v "$_tool" &>/dev/null && command -v register-python-argcomplete &>/dev/null; then
+        eval "$(register-python-argcomplete "$_tool")"
+    fi
+done
+unset _UV_ARGCOMPLETE_TOOLS _tool
