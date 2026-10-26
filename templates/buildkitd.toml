@@ -1,7 +1,7 @@
-[workeroci]
+[worker.oci]
   gcloud = false
 
-[[workerocimounts]]
+[[worker.oci.mounts]]
   source = "${HOME}/.docker/certs/ca-certificates.crt"
   destination = "/etc/ssl/certs/ca-certificates.crt"
   type = "bind"

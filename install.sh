@@ -8,6 +8,8 @@ _PROXY_URL=""
 _DATESTAMP=""
 _OLD_ROOT=""
 _CA_BUNDLE_SRC="${ZSCALER_CA_BUNDLE_SRC:-/etc/ssl/certs/ca-certificates.crt}"
+_ZSCALER_CA_CERT="${ZSCALER_CA_CERT:-/usr/local/share/ca-certificates/amd-corp-cert-zscalar.crt}"
+_BUILDKIT_IMAGE="${BUILDKIT_IMAGE:-local/buildkit-amd:latest}"
 _BUILDX_BUILDER_NAME="${BUILDX_BUILDER_NAME:-amd-moby-buildkit}"
 _BUILDX_NODES=("APCAN-MQ60818VV")
 _STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles"
@@ -385,6 +387,7 @@ main() {
 
     if [[ "$full_install" -eq 1 ]]; then
         expand_templates
+        build_buildkit_image
         bootstrap_buildx_builder
         install_git_hooks
     fi
@@ -585,6 +588,36 @@ PYEOF
     install_amd_skills
 }
 
+build_buildkit_image() {
+    if ! is_buildx_node; then return 0; fi
+    if ! command -v docker &>/dev/null; then return 0; fi
+    if [[ ! -f "$_ZSCALER_CA_CERT" ]]; then
+        echo "[dotfiles] WARNING: $_ZSCALER_CA_CERT not found; skipping custom BuildKit image." >&2
+        return 0
+    fi
+    if docker image inspect "$_BUILDKIT_IMAGE" &>/dev/null; then
+        log "BuildKit image $_BUILDKIT_IMAGE already exists"
+        return 0
+    fi
+    local tmpdir; tmpdir=$(mktemp -d)
+    # shellcheck disable=SC2064
+    trap "rm -rf $tmpdir" RETURN
+    cp "$_ZSCALER_CA_CERT" "$tmpdir/zscalar.crt"
+    cat > "$tmpdir/Dockerfile" << 'EOF'
+FROM moby/buildkit:buildx-stable-1
+COPY zscalar.crt /usr/local/share/ca-certificates/
+RUN cat /usr/local/share/ca-certificates/zscalar.crt \
+        >> /etc/ssl/certs/ca-certificates.crt
+EOF
+    # Use the daemon's embedded builder (not the custom one) to avoid a
+    # chicken-and-egg dependency on the very image we're building.
+    if ! docker build --builder default -t "$_BUILDKIT_IMAGE" "$tmpdir" &>/dev/null; then
+        echo "[dotfiles] WARNING: failed to build custom BuildKit image $_BUILDKIT_IMAGE." >&2
+        return 0
+    fi
+    log "Built custom BuildKit image $_BUILDKIT_IMAGE"
+}
+
 bootstrap_buildx_builder() {
     if ! is_buildx_node; then
         log "Skipping buildx bootstrap (not a buildx node)"
@@ -606,18 +639,48 @@ bootstrap_buildx_builder() {
         return 0
     fi
 
+    # Recreate if the builder exists but lacks network=host (needed on ZScaler hosts
+    # so the BuildKit daemon container can reach Docker Hub through the host network).
+    local instance="$HOME/.docker/buildx/instances/$_BUILDX_BUILDER_NAME"
     if docker buildx inspect "$_BUILDX_BUILDER_NAME" &>/dev/null; then
+        local needs_recreate=0
+        python3 - "$instance" "$_BUILDKIT_IMAGE" << 'PYEOF' 2>/dev/null
+import json, sys
+d = json.load(open(sys.argv[1]))
+opts = (d.get('Nodes') or [{}])[0].get('DriverOpts') or {}
+if opts.get('network') != 'host': sys.exit(1)
+if opts.get('image', '') != sys.argv[2]: sys.exit(1)
+# Also catch the wrong section-name bug (workeroci vs worker.oci)
+import base64
+raw = (d.get('Nodes') or [{}])[0].get('Files', {}).get('buildkitd.toml', '')
+cfg = base64.b64decode(raw).decode() if raw else ''
+if '[[worker.oci.mounts]]' not in cfg: sys.exit(1)
+PYEOF
+        needs_recreate=$?
+        if [[ "$needs_recreate" -ne 0 ]]; then
+            log "Recreating buildx builder $_BUILDX_BUILDER_NAME (config mismatch)"
+            docker buildx rm "$_BUILDX_BUILDER_NAME" &>/dev/null || true
+        fi
+    fi
+
+    if ! docker buildx inspect "$_BUILDX_BUILDER_NAME" &>/dev/null; then
+        if ! docker buildx create \
+                --name "$_BUILDX_BUILDER_NAME" \
+                --driver-opt network=host \
+                --driver-opt "image=$_BUILDKIT_IMAGE" \
+                --config "$config" \
+                --buildkitd-flags '--allow-insecure-entitlement=network.host' \
+                --use &>/dev/null; then
+            echo "[dotfiles] WARNING: failed to create buildx builder $_BUILDX_BUILDER_NAME with $config." >&2
+            return 0
+        fi
+        log "Created Docker buildx builder $_BUILDX_BUILDER_NAME"
+    else
         if ! docker buildx use "$_BUILDX_BUILDER_NAME" &>/dev/null; then
             echo "[dotfiles] WARNING: failed to select buildx builder $_BUILDX_BUILDER_NAME." >&2
             return 0
         fi
         log "Using Docker buildx builder $_BUILDX_BUILDER_NAME"
-    else
-        if ! docker buildx create --name "$_BUILDX_BUILDER_NAME" --config "$config" --use &>/dev/null; then
-            echo "[dotfiles] WARNING: failed to create buildx builder $_BUILDX_BUILDER_NAME with $config." >&2
-            return 0
-        fi
-        log "Created Docker buildx builder $_BUILDX_BUILDER_NAME"
     fi
 
     if ! docker buildx inspect --bootstrap &>/dev/null; then
