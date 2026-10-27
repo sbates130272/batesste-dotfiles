@@ -206,6 +206,12 @@ export PATH="/usr/lib/ccache:$PATH"
 # CA bundle for Claude CLI (WSL + AMD ZScaler)
 export REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
 
+# AMD corporate node env: VM_CA_CERT_FILE and other ZScaler-aware vars
+# (written by install.sh --zscaler; absent on non-AMD nodes)
+if [ -f "$HOME/.config/amd-corp-env.sh" ]; then
+  . "$HOME/.config/amd-corp-env.sh"
+fi
+
 # argcomplete for uv-installed tools — add tool names here as needed
 _UV_ARGCOMPLETE_TOOLS=(qemu-tool)
 for _tool in "${_UV_ARGCOMPLETE_TOOLS[@]}"; do
