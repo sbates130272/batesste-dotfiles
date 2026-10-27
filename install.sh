@@ -4,10 +4,10 @@ set -euo pipefail
 DOTFILES_DIR="${DOTFILES_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 
 _DO_FORCE=0
+_DO_ZSCALER=0
 _PROXY_URL=""
 _DATESTAMP=""
 _OLD_ROOT=""
-_CA_BUNDLE_SRC="${ZSCALER_CA_BUNDLE_SRC:-/etc/ssl/certs/ca-certificates.crt}"
 _ZSCALER_CA_CERT="${ZSCALER_CA_CERT:-/usr/local/share/ca-certificates/amd-corp-cert-zscalar.crt}"
 _BUILDKIT_IMAGE="${BUILDKIT_IMAGE:-local/buildkit-amd:latest}"
 _ALPINE_IMAGE="${ALPINE_IMAGE:-local/alpine-amd:3.20}"
@@ -20,7 +20,7 @@ _STATE_FILE="$_STATE_DIR/install-state"
 # envsubst inputs consumed by expand_templates() and scripts/ is run from the
 # repo; stowing either drops its contents straight into $HOME, which is how
 # ~/aws-credentials and friends appeared.
-_NON_PACKAGES=(templates scripts vendor)
+_NON_PACKAGES=(templates scripts vendor certs)
 
 log() { echo "[dotfiles] $*"; }
 
@@ -284,7 +284,7 @@ stow_package() {
 
 
 usage() {
-    echo "Usage: $0 [--proxy [url]] [--force] [--ca-bundle <path>] [packages...]"
+    echo "Usage: $0 [--proxy [url]] [--zscaler] [--force] [packages...]"
     echo ""
     echo "Options:"
     echo "  --proxy [url] Route Claude traffic through an HTTP proxy. Sets .proxy"
@@ -294,9 +294,12 @@ usage() {
     echo "                Use http://<host>:8888 on LAN nodes that reach the AMD tinyproxy"
     echo "                directly (e.g. --proxy http://10.0.0.107:8888)."
     echo "                Rerunning without --proxy removes the proxy setting (idempotent)."
-    echo "  --ca-bundle   Source CA bundle path copied to ~/.docker/certs/ca-certificates.crt"
-    echo "                before generating ~/.docker/buildkitd.toml (default:"
-    echo "                /etc/ssl/certs/ca-certificates.crt)."
+    echo "  --zscaler     Install the AMD ZScaler CA cert from certs/amd-corp-cert-zscalar.crt"
+    echo "                to /usr/local/share/ca-certificates/ (requires sudo), run"
+    echo "                update-ca-certificates, copy the enriched system bundle to"
+    echo "                ~/.docker/certs/, and write VM_CA_CERT_FILE + AMD_CERT to"
+    echo "                ~/.config/amd-corp-env.sh. Run once on any AMD corporate"
+    echo "                node. Idempotent."
     echo "  --force       Back up conflicting files before stowing (backup extension: .YYYYMMDD_HHMMSS),"
     echo "                and take over symlinks left behind by another checkout of this repo."
     echo ""
@@ -306,8 +309,7 @@ usage() {
     echo "downgrade is reported loudly before anything is changed."
     echo ""
     echo "Environment overrides:"
-    echo "  ZSCALER_CA_BUNDLE_SRC   Default value for --ca-bundle."
-    echo "  BUILDX_BUILDER_NAME     Docker buildx builder name (default: amd-moby-buildkit).
+  echo "  BUILDX_BUILDER_NAME     Docker buildx builder name (default: amd-moby-buildkit).
                           Docker buildkit setup only runs on nodes in _BUILDX_NODES."
     echo ""
     echo "Available packages:"
@@ -342,13 +344,8 @@ main() {
             else
                 _PROXY_URL="http://127.0.0.1:8888"
             fi
-        elif [[ "$arg" == "--ca-bundle" ]]; then
-            if [[ $((i + 1)) -ge ${#argv[@]} ]]; then
-                echo "ERROR: --ca-bundle requires a path argument" >&2
-                exit 1
-            fi
-            i=$((i + 1))
-            _CA_BUNDLE_SRC="${argv[$i]}"
+        elif [[ "$arg" == "--zscaler" ]]; then
+            _DO_ZSCALER=1
         elif [[ "$arg" == "--force" ]]; then
             _DO_FORCE=1
             _DATESTAMP="$(date +%Y%m%d_%H%M%S)"
@@ -386,10 +383,10 @@ main() {
         stow_package "$pkg"
     done
 
+    install_zscaler_cert
     if [[ "$full_install" -eq 1 ]]; then
         expand_templates
         build_alpine_image
-        write_buildx_env
         build_buildkit_image
         bootstrap_buildx_builder
         install_git_hooks
@@ -503,13 +500,13 @@ expand_templates() {
             log "Expanded docker/config.json"
 
             install -d "$HOME/.docker/certs"
-            if [[ -f "$_CA_BUNDLE_SRC" ]]; then
-                cp "$_CA_BUNDLE_SRC" "$HOME/.docker/certs/ca-certificates.crt"
+            local sys_bundle="/etc/ssl/certs/ca-certificates.crt"
+            if [[ -f "$sys_bundle" ]]; then
+                cp "$sys_bundle" "$HOME/.docker/certs/ca-certificates.crt"
                 chmod 644 "$HOME/.docker/certs/ca-certificates.crt"
                 log "Copied CA bundle to ~/.docker/certs/ca-certificates.crt"
             else
-                echo "[dotfiles] WARNING: CA bundle source not found: $_CA_BUNDLE_SRC" >&2
-                echo "           Skipping ~/.docker/certs/ca-certificates.crt copy." >&2
+                echo "[dotfiles] WARNING: $sys_bundle not found; skipping Docker CA bundle copy." >&2
             fi
 
             envsubst < "$tmpl_dir/buildkitd.toml" > "$HOME/.docker/buildkitd.toml"
@@ -591,6 +588,32 @@ PYEOF
     install_amd_skills
 }
 
+install_zscaler_cert() {
+    [[ $_DO_ZSCALER -eq 0 ]] && return 0
+    local cert_src="$DOTFILES_DIR/certs/amd-corp-cert-zscalar.crt"
+    local cert_dst="/usr/local/share/ca-certificates/amd-corp-cert-zscalar.crt"
+    local env_file="$HOME/.config/amd-corp-env.sh"
+    if [[ ! -f "$cert_src" ]]; then
+        echo "[dotfiles] ERROR: $cert_src not found" >&2
+        exit 1
+    fi
+    log "Installing ZScaler CA cert to $cert_dst"
+    sudo install -o root -g root -m 0644 "$cert_src" "$cert_dst"
+    sudo update-ca-certificates
+    log "Writing AMD corp env vars to $env_file"
+    install -d "$(dirname "$env_file")"
+    printf 'export VM_CA_CERT_FILE=%s\n' "$cert_dst" > "$env_file"
+    # AMD_CERT: base64-encoded cert consumed by tapsetup/BuildKit Dockerfiles
+    # as a --build-arg so apk can fetch packages through the ZScaler proxy.
+    printf 'export AMD_CERT=%s\n' "$(base64 -w 0 < "$cert_dst")" >> "$env_file"
+    # Copy the now-enriched system bundle to ~/.docker/certs/ so the Docker
+    # daemon trusts ZScaler when pulling/pushing from registries.
+    install -d "$HOME/.docker/certs"
+    cp /etc/ssl/certs/ca-certificates.crt "$HOME/.docker/certs/ca-certificates.crt"
+    chmod 644 "$HOME/.docker/certs/ca-certificates.crt"
+    log "Copied CA bundle to ~/.docker/certs/ca-certificates.crt"
+}
+
 build_alpine_image() {
     if ! is_buildx_node; then return 0; fi
     if ! command -v docker &>/dev/null; then return 0; fi
@@ -617,18 +640,6 @@ EOF
         return 0
     fi
     log "Built custom Alpine image $_ALPINE_IMAGE"
-}
-
-write_buildx_env() {
-    if ! is_buildx_node; then return 0; fi
-    if [[ ! -f "$_ZSCALER_CA_CERT" ]]; then return 0; fi
-    local envd="$HOME/.config/environment.d"
-    local envf="$envd/60-buildx.conf"
-    install -d "$envd"
-    # Base64-encode the cert so it survives as a single-line env var.
-    # The tapsetup Dockerfile decodes AMD_CERT and appends it before apk runs.
-    printf 'AMD_CERT=%s\n' "$(base64 -w 0 < "$_ZSCALER_CA_CERT")" > "$envf"
-    log "Wrote AMD_CERT to $envf (takes effect on next login)"
 }
 
 build_buildkit_image() {

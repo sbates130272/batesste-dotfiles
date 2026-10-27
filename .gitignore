@@ -14,6 +14,9 @@
 # never reached origin and so never ran.
 !.github/workflows/*.yml
 
+# write_buildx_env() output — generated from the installed cert at runtime
+systemd/.config/environment.d/
+
 # expand_templates() outputs — written to $HOME, never inside the repo tree
 aws/.aws/credentials
 aws/.aws/*.pmem
