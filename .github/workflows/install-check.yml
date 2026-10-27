@@ -69,51 +69,50 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: --proxy sets default URL when no URL given
+      - name: --claude-proxy sets default URL when no URL given
         run: |
           bash <<'EOF'
           DOTFILES_DIR="$PWD"
           source install.sh
-          # Simulate arg parsing for --proxy with no URL.
-          _PROXY_URL=""
-          argv=(--proxy)
+          _CLAUDE_PROXY_URL=""
+          argv=(--claude-proxy)
           i=0
           while [[ $i -lt ${#argv[@]} ]]; do
             arg="${argv[$i]}"
-            if [[ "$arg" == "--proxy" ]]; then
+            if [[ "$arg" == "--claude-proxy" ]]; then
               if [[ $((i + 1)) -lt ${#argv[@]} && "${argv[$((i + 1))]}" == http* ]]; then
-                i=$((i + 1)); _PROXY_URL="${argv[$i]}"
+                i=$((i + 1)); _CLAUDE_PROXY_URL="${argv[$i]}"
               else
-                _PROXY_URL="http://127.0.0.1:8888"
+                _CLAUDE_PROXY_URL="http://127.0.0.1:8888"
               fi
             fi
             i=$((i + 1))
           done
-          [ "$_PROXY_URL" = "http://127.0.0.1:8888" ] && echo "OK: default proxy URL set" \
-            || { echo "ERROR: got '$_PROXY_URL'"; exit 1; }
+          [ "$_CLAUDE_PROXY_URL" = "http://127.0.0.1:8888" ] && echo "OK: default proxy URL set" \
+            || { echo "ERROR: got '$_CLAUDE_PROXY_URL'"; exit 1; }
           EOF
 
-      - name: --proxy accepts explicit URL
+      - name: --claude-proxy accepts explicit URL
         run: |
           bash <<'EOF'
           DOTFILES_DIR="$PWD"
           source install.sh
-          _PROXY_URL=""
-          argv=(--proxy http://10.0.0.107:8888)
+          _CLAUDE_PROXY_URL=""
+          argv=(--claude-proxy http://10.0.0.107:8888)
           i=0
           while [[ $i -lt ${#argv[@]} ]]; do
             arg="${argv[$i]}"
-            if [[ "$arg" == "--proxy" ]]; then
+            if [[ "$arg" == "--claude-proxy" ]]; then
               if [[ $((i + 1)) -lt ${#argv[@]} && "${argv[$((i + 1))]}" == http* ]]; then
-                i=$((i + 1)); _PROXY_URL="${argv[$i]}"
+                i=$((i + 1)); _CLAUDE_PROXY_URL="${argv[$i]}"
               else
-                _PROXY_URL="http://127.0.0.1:8888"
+                _CLAUDE_PROXY_URL="http://127.0.0.1:8888"
               fi
             fi
             i=$((i + 1))
           done
-          [ "$_PROXY_URL" = "http://10.0.0.107:8888" ] && echo "OK: explicit proxy URL set" \
-            || { echo "ERROR: got '$_PROXY_URL'"; exit 1; }
+          [ "$_CLAUDE_PROXY_URL" = "http://10.0.0.107:8888" ] && echo "OK: explicit proxy URL set" \
+            || { echo "ERROR: got '$_CLAUDE_PROXY_URL'"; exit 1; }
           EOF
 
       - name: unknown flags are rejected
@@ -134,33 +133,47 @@ jobs:
           [ "$rc" -eq 0 ] && echo "OK: exited 0" || { echo "ERROR: --help should exit 0"; exit 1; }
           EOF
 
-      - name: --ca-bundle sets custom source path
+  zscaler-flag:
+    name: --zscaler flag behaviour
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: --zscaler sets _DO_ZSCALER=1
         run: |
           bash <<'EOF'
           DOTFILES_DIR="$PWD"
           source install.sh
-          check_deps() { :; }
-          check_secrets_unlocked() { :; }
-          init_submodules() { :; }
-          check_relocation() { :; }
-          version_check() { :; }
-          stow_package() { :; }
-          expand_templates() { :; }
-          bootstrap_buildx_builder() { :; }
-          install_git_hooks() { :; }
-          record_install() { :; }
-          post_install_reminders() { :; }
-          main --ca-bundle /tmp/zscaler-custom.crt
-          [ "$_CA_BUNDLE_SRC" = "/tmp/zscaler-custom.crt" ] && echo "OK: _CA_BUNDLE_SRC set" || { echo "ERROR: _CA_BUNDLE_SRC not set correctly"; exit 1; }
+          _DO_ZSCALER=0
+          argv=(--zscaler)
+          i=0
+          while [[ $i -lt ${#argv[@]} ]]; do
+            arg="${argv[$i]}"
+            [[ "$arg" == "--zscaler" ]] && _DO_ZSCALER=1
+            i=$((i + 1))
+          done
+          [ "$_DO_ZSCALER" -eq 1 ] && echo "OK: _DO_ZSCALER=1" \
+            || { echo "ERROR: _DO_ZSCALER=$_DO_ZSCALER"; exit 1; }
           EOF
 
-      - name: --ca-bundle without value is rejected
+      - name: install_zscaler_cert is a no-op without --zscaler
         run: |
           bash <<'EOF'
           DOTFILES_DIR="$PWD"
           source install.sh
-          check_deps() { :; }
-          check_secrets_unlocked() { :; }
-          { ( main --ca-bundle ); rc=$?; } || true
-          [ "$rc" -ne 0 ] && echo "OK: exited non-zero as expected" || { echo "ERROR: should have exited non-zero"; exit 1; }
+          _DO_ZSCALER=0
+          ran=0
+          sudo() { ran=1; }
+          install_zscaler_cert
+          [ "$ran" -eq 0 ] && echo "OK: no-op when _DO_ZSCALER=0" \
+            || { echo "ERROR: sudo was called without --zscaler"; exit 1; }
           EOF
+
+      - name: certs/amd-corp-cert-zscalar.crt exists in the repo
+        run: |
+          test -f certs/amd-corp-cert-zscalar.crt \
+            && echo "OK: cert present" \
+            || { echo "ERROR: certs/amd-corp-cert-zscalar.crt missing"; exit 1; }
+          openssl x509 -noout -subject -in certs/amd-corp-cert-zscalar.crt \
+            && echo "OK: valid PEM cert" \
+            || { echo "ERROR: not a valid PEM cert"; exit 1; }
