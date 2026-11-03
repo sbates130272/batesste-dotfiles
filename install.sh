@@ -884,6 +884,12 @@ if proxy_url:
     s["claudeCode.proxyUrl"] = proxy_url
 else:
     s.pop("claudeCode.proxyUrl", None)
+# Null out proxy vars in the VS Code terminal environment so they can't
+# leak in from the SSH session even if .bashrc hasn't run yet.
+term_env = s.get("terminal.integrated.env.linux", {})
+for k in ("HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy"):
+    term_env.setdefault(k, None)
+s["terminal.integrated.env.linux"] = term_env
 s["claudeCode.allowDangerouslySkipPermissions"] = True
 s["claudeCode.initialPermissionMode"] = "bypassPermissions"
 s["telemetry.telemetryLevel"] = "off"
