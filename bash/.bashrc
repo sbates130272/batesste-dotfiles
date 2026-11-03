@@ -212,8 +212,12 @@ if [ -f "$HOME/.config/amd-corp-env.sh" ]; then
   . "$HOME/.config/amd-corp-env.sh"
 fi
 
+# ZScaler proxies the network transparently; shell-level proxy vars break tools
+# by double-proxying or misrouting. Unset both casings unconditionally.
+unset HTTP_PROXY HTTPS_PROXY NO_PROXY http_proxy https_proxy no_proxy
+
 # argcomplete for uv-installed tools — add tool names here as needed
-_UV_ARGCOMPLETE_TOOLS=(qemu-tool)
+_UV_ARGCOMPLETE_TOOLS=(qemu-tool ktool)
 for _tool in "${_UV_ARGCOMPLETE_TOOLS[@]}"; do
     if command -v "$_tool" &>/dev/null && command -v register-python-argcomplete &>/dev/null; then
         eval "$(register-python-argcomplete "$_tool")"
