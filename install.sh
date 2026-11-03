@@ -588,6 +588,80 @@ PYEOF
         log "Pre-approved API key in $claude_json"
     )
     install_amd_skills
+    setup_llm_relay
+}
+
+# Create a socat relay on 127.0.0.1:443 that tunnels llm-api.amd.com traffic
+# through an HTTP CONNECT proxy (tinyproxy), then add an /etc/hosts alias so
+# the CLI and VS Code extension can reach the AMD gateway without HTTPS_PROXY.
+#
+# Only runs when:
+#   - --claude-proxy was given (sets _CLAUDE_PROXY_URL)
+#   - llm-api.amd.com does NOT resolve to a routable address directly
+#     (i.e. this is not the WSL2 host that has ZScaler visibility)
+setup_llm_relay() {
+    [[ -z "$_CLAUDE_PROXY_URL" ]] && return 0
+    command -v socat &>/dev/null || { log "socat not found — skipping LLM relay setup (install socat to enable)"; return 0; }
+
+    # Check if llm-api.amd.com is directly reachable (skip /etc/hosts by using
+    # the DNS name with a fresh lookup that ignores any existing /etc/hosts entry).
+    local resolved
+    resolved=$(getent hosts llm-api.amd.com 2>/dev/null | awk '{print $1}' | head -1)
+
+    # If it resolves to 127.0.0.1 it's already using our own /etc/hosts alias —
+    # treat that as "not natively reachable" so we still install/refresh the relay.
+    if [[ -n "$resolved" && "$resolved" != "127.0.0.1" ]]; then
+        log "llm-api.amd.com resolves to $resolved directly — skipping relay setup"
+        return 0
+    fi
+
+    # Parse proxy host and port from _CLAUDE_PROXY_URL (http://host:port[/...]).
+    local proxy_host proxy_port
+    proxy_host=$(printf '%s' "$_CLAUDE_PROXY_URL" | sed -E 's|https?://([^:/]+).*|\1|')
+    proxy_port=$(printf '%s' "$_CLAUDE_PROXY_URL" | sed -E 's|https?://[^:]+:([0-9]+).*|\1|')
+    if [[ -z "$proxy_host" || -z "$proxy_port" || "$proxy_port" == "$_CLAUDE_PROXY_URL" ]]; then
+        echo "[dotfiles] WARNING: cannot parse proxy host/port from $_CLAUDE_PROXY_URL — skipping relay" >&2
+        return 0
+    fi
+
+    # /etc/hosts alias
+    local hosts_entry="127.0.0.1 llm-api.amd.com"
+    if ! grep -qF "$hosts_entry" /etc/hosts 2>/dev/null; then
+        log "Adding '$hosts_entry' to /etc/hosts"
+        printf '\n%s\n' "$hosts_entry" | sudo tee -a /etc/hosts > /dev/null
+    else
+        log "/etc/hosts already has entry for llm-api.amd.com"
+    fi
+
+    # systemd service
+    local svc_file="/etc/systemd/system/llm-api-relay.service"
+    local svc_content
+    svc_content="[Unit]
+Description=AMD LLM API relay via HTTP proxy
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/socat TCP4-LISTEN:443,reuseaddr,fork,bind=127.0.0.1 PROXY:${proxy_host}:llm-api.amd.com:443,proxyport=${proxy_port}
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target"
+
+    local existing_content
+    existing_content=$(cat "$svc_file" 2>/dev/null || true)
+    if [[ "$existing_content" != "$svc_content" ]]; then
+        log "Writing $svc_file"
+        printf '%s\n' "$svc_content" | sudo tee "$svc_file" > /dev/null
+        sudo systemctl daemon-reload
+    else
+        log "$svc_file is up to date"
+    fi
+
+    sudo systemctl enable --now llm-api-relay.service
+    log "llm-api-relay.service enabled and running"
 }
 
 install_zscaler_cert() {
