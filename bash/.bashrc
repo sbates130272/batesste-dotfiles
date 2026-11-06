@@ -224,3 +224,10 @@ for _tool in "${_UV_ARGCOMPLETE_TOOLS[@]}"; do
     fi
 done
 unset _UV_ARGCOMPLETE_TOOLS _tool
+
+# Per-tool shell config — drop *.sh files in ~/.bashrc.d/ to extend without
+# editing this file (e.g. mutt_setup, local overrides).
+for _f in "$HOME/.bashrc.d/"*.sh; do
+    [[ -r "$_f" ]] && . "$_f"
+done
+unset _f
