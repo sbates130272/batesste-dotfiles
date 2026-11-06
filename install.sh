@@ -606,7 +606,7 @@ setup_llm_relay() {
     # Check if llm-api.amd.com is directly reachable (skip /etc/hosts by using
     # the DNS name with a fresh lookup that ignores any existing /etc/hosts entry).
     local resolved
-    resolved=$(getent hosts llm-api.amd.com 2>/dev/null | awk '{print $1}' | head -1)
+    resolved=$(getent hosts llm-api.amd.com 2>/dev/null | awk '{print $1}' | head -1) || true
 
     # If it resolves to 127.0.0.1 it's already using our own /etc/hosts alias —
     # treat that as "not natively reachable" so we still install/refresh the relay.
