@@ -61,9 +61,16 @@ for file in "${staged[@]}"; do
     fi
 
     # X.509 files: PEM base64 always triggers high-entropy but is public infra.
-    if [[ "$file" =~ \.(crt|pem|cer|der)$ ]]; then
+    if [[ "$file" =~ \.(crt|pem|cer|der|pub)$ ]]; then
         continue
     fi
+
+    # Lock files: package manager checksums are structural data, not secrets.
+    case "$(basename "$file")" in
+        package-lock.json|yarn.lock|Cargo.lock|go.sum|Gemfile.lock|\
+        poetry.lock|pnpm-lock.yaml|flake.lock|composer.lock)
+            continue ;;
+    esac
 
     # Extract added lines (strip leading +), then normalize before matching:
     #   1. Remove envsubst placeholders (${VAR}) — template files are safe.
@@ -149,6 +156,12 @@ for file in "${staged[@]}"; do
 
         echo -e "${RED}[pre-commit] Possible secret detected in $file${NC}"
         echo -e "  ${YELLOW}Pattern: $label${NC}"
+        while IFS= read -r _m; do
+            [[ -z "$_m" ]] && continue
+            _display="${_m:0:24}"
+            [[ "${#_m}" -gt 24 ]] && _display+="…"
+            echo -e "  ${YELLOW}Matched:  $_display${NC}"
+        done < <(printf '%s\n' "$matches" | head -3)
         found=1
     done
 done
