@@ -61,9 +61,16 @@ for file in "${staged[@]}"; do
     fi
 
     # X.509 files: PEM base64 always triggers high-entropy but is public infra.
-    if [[ "$file" =~ \.(crt|pem|cer|der)$ ]]; then
+    if [[ "$file" =~ \.(crt|pem|cer|der|pub)$ ]]; then
         continue
     fi
+
+    # Lock files: package manager checksums are structural data, not secrets.
+    case "$(basename "$file")" in
+        package-lock.json|yarn.lock|Cargo.lock|go.sum|Gemfile.lock|\
+        poetry.lock|pnpm-lock.yaml|flake.lock|composer.lock)
+            continue ;;
+    esac
 
     # Extract added lines (strip leading +), then normalize before matching:
     #   1. Remove envsubst placeholders (${VAR}) — template files are safe.
@@ -108,7 +115,7 @@ for file in "${staged[@]}"; do
 
         # Discard git SHAs used as version pins (COMMIT=, _commit:, git checkout…).
         sha_ctx="$(printf '%s\n' "$scan_lines" \
-            | grep -P '(COMMIT[[:space:]]*[=:]|_commit[[:space:]]*:|git checkout|git rev-parse|_SHA[[:space:]]*[=:]|_HASH[[:space:]]*[=:])' \
+            | grep -P '(COMMIT[[:space:]]*[=:]|_commit[[:space:]]*:|git checkout|git rev-parse|_SHA[0-9]*[[:space:]]*[=:]|_HASH[[:space:]]*[=:])' \
             | grep -oP "$regex" | sort -u || true)"
         [[ -n "$sha_ctx" ]] && matches="$(printf '%s\n' "$matches" | grep -vFxf <(printf '%s\n' "$sha_ctx") || true)"
         [[ -z "$matches" ]] && continue
@@ -130,13 +137,31 @@ for file in "${staged[@]}"; do
         # they carry no entropy. Anchored on real filesystem roots so base64
         # blobs (which don't start with /etc/) are still caught.
         path_ctx="$(printf '%s\n' "$scan_lines" \
-            | grep -oP '(?<![A-Za-z0-9])/(?:etc|usr|var|home|opt|srv|tmp)/(?:[A-Za-z0-9._+-]+/)*[A-Za-z0-9._+-]+' \
+            | grep -oP '(?<![A-Za-z0-9])/(?:etc|usr|var|home|opt|srv|tmp|build|output|src|app|workspace)/(?:[A-Za-z0-9._+-]+/)*[A-Za-z0-9._+-]+' \
             | grep -oP "$regex" | sort -u || true)"
         [[ -n "$path_ctx" ]] && matches="$(printf '%s\n' "$matches" | grep -vFxf <(printf '%s\n' "$path_ctx") || true)"
         [[ -z "$matches" ]] && continue
 
+        # Discard URLs. The path rule above anchors on filesystem roots, so a
+        # URL's path segments are never covered by it -- and a repository or
+        # package-index URL trivially exceeds 40 chars of [A-Za-z0-9/].
+        #
+        # Deliberately narrow: no userinfo (negative lookahead on @) and the
+        # match stops before ? and #, so a credential in a URL is still caught.
+        url_ctx="$(printf '%s\n' "$scan_lines" \
+            | grep -oP '(?<![A-Za-z0-9])[a-z][a-z0-9+.-]*://(?![^/\s"]*@)[A-Za-z0-9._-]+(?::[0-9]+)?(?:/[A-Za-z0-9._~+-]+)*/?' \
+            | grep -oP "$regex" | sort -u || true)"
+        [[ -n "$url_ctx" ]] && matches="$(printf '%s\n' "$matches" | grep -vFxf <(printf '%s\n' "$url_ctx") || true)"
+        [[ -z "$matches" ]] && continue
+
         echo -e "${RED}[pre-commit] Possible secret detected in $file${NC}"
         echo -e "  ${YELLOW}Pattern: $label${NC}"
+        while IFS= read -r _m; do
+            [[ -z "$_m" ]] && continue
+            _display="${_m:0:24}"
+            [[ "${#_m}" -gt 24 ]] && _display+="…"
+            echo -e "  ${YELLOW}Matched:  $_display${NC}"
+        done < <(printf '%s\n' "$matches" | head -3)
         found=1
     done
 done
