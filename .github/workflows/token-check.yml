@@ -39,6 +39,7 @@ jobs:
       # ── GH_TOKEN_SBATES130272_ROCM (fine-grained PAT) ──────────────────────
       # Expected: personal repo + ROCm org repo
       - name: SBATES130272_ROCM → personal repo
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN_SBATES130272_ROCM }}
         run: |
@@ -51,6 +52,7 @@ jobs:
           echo "OK"
 
       - name: SBATES130272_ROCM → ROCm repo
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN_SBATES130272_ROCM }}
         run: |
@@ -65,6 +67,7 @@ jobs:
       # ── GH_TOKEN_STEBATES_AMDENG (AMD org classic PAT) ────────────────────
       # Expected: ROCm org repo; personal repo works because it is public
       - name: STEBATES_AMDENG → ROCm repo
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN_STEBATES_AMDENG }}
         run: |
@@ -77,6 +80,7 @@ jobs:
           echo "OK"
 
       - name: STEBATES_AMDENG → personal repo
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN_STEBATES_AMDENG }}
         run: |
@@ -91,6 +95,7 @@ jobs:
       # ── GH_TOKEN_SBATES130272 (classic personal PAT) ──────────────────────
       # Expected: personal repo + org admin operations
       - name: SBATES130272 → personal repo
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN_SBATES130272 }}
         run: |

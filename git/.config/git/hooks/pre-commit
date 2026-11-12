@@ -39,6 +39,7 @@ found=0
 # Paths where long hex strings and high-entropy patterns are structural, not secrets.
 declare -a SECRET_SCAN_ALLOWLIST=(
     "patches/"
+    "uv.lock"
 )
 
 for file in "${staged[@]}"; do
