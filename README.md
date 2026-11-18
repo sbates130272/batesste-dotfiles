@@ -28,7 +28,7 @@ gh/            # ~/.config/gh/config.yml (non-secret gh settings)
 git/           # ~/.gitconfig, ~/.config/git/hooks/pre-commit
 gpg/           # ~/.gnupg/gpg-agent.conf (pinentry and agent settings)
 secrets/       # ~/.secrets.env (git-crypt encrypted)
-ssh/           # ~/.ssh/config
+ssh/           # ~/.ssh/config (git-crypt encrypted)
 systemd/       # ~/.config/environment.d/ (user unit environment files)
 ```
 
@@ -124,6 +124,7 @@ Secrets are stored encrypted in this repo using [git-crypt](https://github.com/A
 | File | Purpose |
 | --- | --- |
 | `secrets/.secrets.env` | All secret values (API keys, tokens, credentials) |
+| `ssh/.ssh/config` | SSH host aliases (internal host names and IP addresses) |
 
 `install.sh` uses `envsubst` to expand templates in `templates/` into `$HOME` after sourcing the secrets file. Some secrets are written directly to well-known locations rather than exported as shell environment variables.
 
