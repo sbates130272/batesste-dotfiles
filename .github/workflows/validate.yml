@@ -18,18 +18,22 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Check secrets.env is git-crypt encrypted
+      - name: Check git-crypt protected files are encrypted
         run: |
-          FILE="secrets/.secrets.env"
-          if [ ! -f "$FILE" ]; then
-            echo "SKIP: $FILE not present"
-            exit 0
-          fi
-          if file "$FILE" | grep -qE "ASCII|UTF-8|text"; then
-            echo "ERROR: $FILE is not encrypted — it must be protected by git-crypt."
-            exit 1
-          fi
-          echo "OK: $FILE is encrypted"
+          failed=0
+          for FILE in secrets/.secrets.env ssh/.ssh/config; do
+            if [ ! -f "$FILE" ]; then
+              echo "SKIP: $FILE not present"
+              continue
+            fi
+            if file "$FILE" | grep -qE "ASCII|UTF-8|text"; then
+              echo "ERROR: $FILE is not encrypted — it must be protected by git-crypt."
+              failed=1
+            else
+              echo "OK: $FILE is encrypted"
+            fi
+          done
+          exit $failed
 
       - name: Check plaintext files contain no secrets
         run: |

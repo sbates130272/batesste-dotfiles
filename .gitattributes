@@ -1,1 +1,2 @@
 secrets/.secrets.env filter=git-crypt diff=git-crypt
+ssh/.ssh/config filter=git-crypt diff=git-crypt

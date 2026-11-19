@@ -988,7 +988,12 @@ install_amd_skills() {
     for _skill_dir in "$skills_src"/*/; do
         [[ -d "$_skill_dir" ]] || continue
         _skill_name="$(basename "$_skill_dir")"
-        cp -r "$_skill_dir" "$HOME/.claude/skills/$_skill_name"
+        # Copy the contents, not the directory: "cp -r src dest" nests src
+        # inside dest when dest already exists from an earlier install.
+        install -d "$HOME/.claude/skills/$_skill_name"
+        cp -r "${_skill_dir}." "$HOME/.claude/skills/$_skill_name/"
+        # Remove the nested copy an older version of this function left behind.
+        [[ -e "${_skill_dir}${_skill_name}" ]] || rm -rf "$HOME/.claude/skills/$_skill_name/$_skill_name"
         log "Installed AMD skill: $_skill_name"
     done
 }

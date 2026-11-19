@@ -133,6 +133,14 @@ for file in "${staged[@]}"; do
         matches="$(printf '%s\n' "$matches" | grep -vP '^[0-9a-f]{40}$' || true)"
         [[ -z "$matches" ]] && continue
 
+        # Discard OCI image digests (image@sha256:<64 hex>): they pin a public
+        # image. Only the sha256: context is exempt, so a bare 64-char hex value
+        # is still reported.
+        digest_ctx="$(printf '%s\n' "$scan_lines" \
+            | grep -oP '(?<=sha256:)[0-9a-f]{64}(?![0-9a-f])' | sort -u || true)"
+        [[ -n "$digest_ctx" ]] && matches="$(printf '%s\n' "$matches" | grep -vFxf <(printf '%s\n' "$digest_ctx") || true)"
+        [[ -z "$matches" ]] && continue
+
         # Discard filesystem paths. The high-entropy character class includes
         # alphanumerics and slash, so deep directory paths satisfy it even though
         # they carry no entropy. Anchored on real filesystem roots so base64
