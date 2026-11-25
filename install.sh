@@ -543,6 +543,13 @@ expand_templates() {
         chmod 600 "$HOME/.ansible/galaxy_token"
         log "Expanded ansible/galaxy_token"
 
+        if [[ -n "${PYPI_GLOBAL_TOKEN_SBATES_VALUE:-}" ]]; then
+            printf '[distutils]\nindex-servers = pypi\n\n[pypi]\nusername = __token__\npassword = %s\n' \
+                "$PYPI_GLOBAL_TOKEN_SBATES_VALUE" > "$HOME/.pypirc"
+            chmod 600 "$HOME/.pypirc"
+            log "Expanded .pypirc"
+        fi
+
         install -d "$HOME/.config"
         printf 'export OPENROUTER_API_KEY=%s\n' "$OPENROUTER_API_KEY" > "$HOME/.config/openrouter-env.sh"
         chmod 600 "$HOME/.config/openrouter-env.sh"
