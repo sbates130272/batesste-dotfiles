@@ -17,6 +17,7 @@ declare -A PATTERNS=(
     ["HuggingFace token"]='hf_[a-zA-Z0-9]{20,}'
     ["Docker auth (base64)"]='\"auth\":[[:space:]]*\"[A-Za-z0-9+/]{40,}={0,2}\"'
     ["GitHub token"]='gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{20,}'
+    ["PyPI token"]='pypi-[A-Za-z0-9_-]{20,}'
     ["AMD API gateway key"]='Ocp-Apim-Subscription-Key:[[:space:]]*[0-9a-fA-F]{32}'
     ["Generic high-entropy string"]='[A-Za-z0-9+/]{40,}={0,2}'
 )
@@ -40,6 +41,13 @@ found=0
 declare -a SECRET_SCAN_ALLOWLIST=(
     "patches/"
     "uv.lock"
+    # Benchmark case names and golden test records carry long slash-separated
+    # keys and SHA-256 content hashes.
+    ".ci/bench/"
+    ".ci/scripts/tests/fixtures/"
+    # Generated PEP 503 package indexes: every link carries a "#sha256=<64 hex>"
+    # fragment that satisfies the high-entropy pattern. The hashes are the point.
+    "data/wheels/"
 )
 
 for file in "${staged[@]}"; do
